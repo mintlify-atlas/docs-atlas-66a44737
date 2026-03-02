@@ -1,0 +1,286 @@
+---
+title: Exceptions
+description: Exception types thrown by QueryKit during parsing and query execution
+---
+
+QueryKit provides a comprehensive set of exception types to help diagnose issues with filter and sort operations. All exceptions inherit from the base `QueryKitException` class.
+
+## Exception Hierarchy
+
+All QueryKit exceptions inherit from `QueryKitException`, which inherits from `System.Exception`. This allows you to catch all QueryKit-specific errors with a single catch block if needed.
+
+<Accordion title="QueryKitException">
+  **Base class:** `System.Exception`
+
+  **Description:** The base exception class for all QueryKit exceptions. All other exceptions in this library inherit from this class.
+
+  **Usage:** Catch this exception type to handle any QueryKit-related error generically.
+
+  ```csharp
+  try
+  {
+      var results = query.ApplyQueryKitFilter(filterString);
+  }
+  catch (QueryKitException ex)
+  {
+      // Handle any QueryKit exception
+      Console.WriteLine($"QueryKit error: {ex.Message}");
+  }
+  ```
+</Accordion>
+
+## Parsing Exceptions
+
+These exceptions are thrown when QueryKit encounters errors while parsing filter or sort expressions.
+
+<Accordion title="ParsingException">
+  **Base class:** `QueryKitException`
+
+  **Description:** Thrown when there is a general parsing failure, typically due to invalid syntax, incorrect operators, or improperly formatted values.
+
+  **Common causes:**
+  - Invalid comparison or logical operators
+  - Missing double quotes around string or GUID values
+  - Malformed expressions
+
+  **Example:**
+  ```csharp
+  // Missing quotes around string value
+  var filter = "Name == John";  // Should be "Name == \"John\""
+  
+  try
+  {
+      var results = query.ApplyQueryKitFilter(filter);
+  }
+  catch (ParsingException ex)
+  {
+      // Error: There was a parsing failure, likely due to an invalid 
+      // comparison or logical operator. You may also be missing double 
+      // quotes surrounding a string or guid.
+  }
+  ```
+</Accordion>
+
+<Accordion title="QueryKitParsingException">
+  **Base class:** `QueryKitException`
+
+  **Description:** A general-purpose parsing exception with a custom message. Used for specific parsing errors that don't fit other exception categories.
+
+  **Example:**
+  ```csharp
+  try
+  {
+      var results = query.ApplyQueryKitFilter(complexFilter);
+  }
+  catch (QueryKitParsingException ex)
+  {
+      Console.WriteLine($"Parsing error: {ex.Message}");
+  }
+  ```
+</Accordion>
+
+<Accordion title="UnknownFilterPropertyException">
+  **Base class:** `QueryKitException`
+
+  **Description:** Thrown when a filter expression references a property that doesn't exist on the entity or hasn't been configured in the property mappings.
+
+  **Example:**
+  ```csharp
+  public class Person
+  {
+      public string FirstName { get; set; }
+      public string LastName { get; set; }
+  }
+  
+  // "FullName" doesn't exist on Person
+  var filter = "FullName == \"John Doe\"";
+  
+  try
+  {
+      var results = query.ApplyQueryKitFilter(filter);
+  }
+  catch (UnknownFilterPropertyException ex)
+  {
+      // Error: The filter property 'FullName' was not recognized.
+  }
+  ```
+</Accordion>
+
+<Accordion title="SortParsingException">
+  **Base class:** `QueryKitException`
+
+  **Description:** Thrown when parsing fails during a sort operation, typically because the specified property name is not recognized.
+
+  **Example:**
+  ```csharp
+  public class Person
+  {
+      public string FirstName { get; set; }
+      public int Age { get; set; }
+  }
+  
+  // "Salary" doesn't exist on Person
+  var sort = "Salary asc";
+  
+  try
+  {
+      var results = query.ApplyQueryKitSort(sort);
+  }
+  catch (SortParsingException ex)
+  {
+      // Error: Parsing failed during sorting. 'Salary' was not recognized.
+  }
+  ```
+</Accordion>
+
+<Accordion title="QueryKitPropertyDepthExceededException">
+  **Base class:** `QueryKitException`
+
+  **Description:** Thrown when a property path exceeds the maximum allowed depth. This prevents excessive nested property access that could impact performance.
+
+  **Example:**
+  ```csharp
+  var config = new QueryKitConfiguration(config =>
+  {
+      config.MaxPropertyDepth = 2;
+  });
+  
+  // This path has 3 levels: Customer.Address.City
+  var filter = "Customer.Address.City == \"Boston\"";
+  
+  try
+  {
+      var results = query.ApplyQueryKitFilter(filter, config);
+  }
+  catch (QueryKitPropertyDepthExceededException ex)
+  {
+      // Error: The property path 'Customer.Address.City' has a depth of 3,
+      // which exceeds the maximum allowed depth of 2.
+  }
+  ```
+</Accordion>
+
+## Configuration Exceptions
+
+These exceptions are thrown when there are issues with QueryKit configuration.
+
+<Accordion title="QueryKitDbContextTypeException">
+  **Base class:** `QueryKitException`
+
+  **Description:** Thrown when a DbContext type is required for an operation but hasn't been provided in the QueryKit configuration.
+
+  **Common causes:**
+  - Using database-specific operators (like `@@` for sounds-like) without configuring the DbContext type
+  - Attempting operations that require database context information
+
+  **Example:**
+  ```csharp
+  // Using sounds-like operator without DbContext configuration
+  var filter = "Name @@ \"John\"";
+  
+  try
+  {
+      var results = query.ApplyQueryKitFilter(filter);
+  }
+  catch (QueryKitDbContextTypeException ex)
+  {
+      // Error: There no DbContext type provided in your QueryKit config,
+      // but one was needed for this operation.
+  }
+  
+  // Fix: Configure DbContext type
+  var config = new QueryKitConfiguration(config =>
+  {
+      config.DbContextType = typeof(MyDbContext);
+  });
+  ```
+</Accordion>
+
+<Accordion title="SoundsLikeNotImplementedException">
+  **Base class:** `QueryKitException`
+
+  **Description:** Thrown when attempting to use the sounds-like operator (`@@`) with a DbContext that doesn't implement the required `SoundsLike` method.
+
+  **Example:**
+  ```csharp
+  public class MyDbContext : DbContext
+  {
+      // Missing: public bool SoundsLike(string value, string pattern)
+  }
+  
+  var config = new QueryKitConfiguration(config =>
+  {
+      config.DbContextType = typeof(MyDbContext);
+  });
+  
+  var filter = "Name @@ \"John\"";
+  
+  try
+  {
+      var results = query.ApplyQueryKitFilter(filter, config);
+  }
+  catch (SoundsLikeNotImplementedException ex)
+  {
+      // Error: The DbContext type MyDbContext does not have a SoundsLike method.
+  }
+  ```
+</Accordion>
+
+## Best Practices
+
+### Handling Exceptions
+
+Consider catching specific exceptions for more granular error handling:
+
+```csharp
+try
+{
+    var results = query
+        .ApplyQueryKitFilter(filterString)
+        .ApplyQueryKitSort(sortString);
+}
+catch (UnknownFilterPropertyException ex)
+{
+    return BadRequest($"Invalid property in filter: {ex.Message}");
+}
+catch (SortParsingException ex)
+{
+    return BadRequest($"Invalid sort expression: {ex.Message}");
+}
+catch (ParsingException ex)
+{
+    return BadRequest($"Invalid syntax: {ex.Message}");
+}
+catch (QueryKitException ex)
+{
+    return BadRequest($"Query error: {ex.Message}");
+}
+```
+
+### Validation
+
+Validate user input before applying filters to provide better error messages:
+
+```csharp
+public async Task<IActionResult> GetPeople([FromQuery] string filter)
+{
+    if (string.IsNullOrWhiteSpace(filter))
+    {
+        return BadRequest("Filter cannot be empty");
+    }
+    
+    try
+    {
+        var results = await _context.People
+            .ApplyQueryKitFilter(filter)
+            .ToListAsync();
+            
+        return Ok(results);
+    }
+    catch (QueryKitException ex)
+    {
+        _logger.LogWarning(ex, "Invalid filter expression: {Filter}", filter);
+        return BadRequest(new { error = ex.Message });
+    }
+}
+```

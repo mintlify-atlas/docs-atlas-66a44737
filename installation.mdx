@@ -1,0 +1,135 @@
+---
+title: Installation
+description: Install QueryKit in your .NET project via NuGet and start filtering and sorting your data.
+---
+
+## Install via .NET CLI
+
+The simplest way to add QueryKit to your project is using the .NET CLI:
+
+```bash
+dotnet add package QueryKit
+```
+
+## Install via NuGet Package Manager
+
+Alternatively, you can use the NuGet Package Manager in Visual Studio:
+
+```powershell
+Install-Package QueryKit
+```
+
+## Package Information
+
+<Note>
+  QueryKit is distributed as a single NuGet package with multi-targeting support for modern .NET versions.
+</Note>
+
+- **Package ID**: `QueryKit`
+- **Current Version**: 1.13.0
+- **Author**: Paul DeVito
+- **License**: Apache-2.0
+- **Repository**: [github.com/pdevito3/QueryKit](https://github.com/pdevito3/QueryKit)
+
+## Supported Frameworks
+
+QueryKit supports the following .NET target frameworks:
+
+- .NET 6.0 (`net6.0`)
+- .NET 7.0 (`net7.0`)
+- .NET 8.0 (`net8.0`)
+- .NET 9.0 (`net9.0`)
+- .NET 10.0 (`net10.0`)
+
+<Tip>
+  QueryKit automatically selects the appropriate version for your target framework, so you don't need to worry about compatibility.
+</Tip>
+
+## Dependencies
+
+QueryKit has minimal dependencies:
+
+- **Sprache** (2.3.1) - Parser combinator library used for the filter/sort syntax parser
+- **Ardalis.SmartEnum** (8.2.0) - Provides type-safe enumerations for operators and configuration
+
+<Note>
+  These dependencies are automatically installed when you add QueryKit to your project.
+</Note>
+
+## Verify Installation
+
+After installation, verify that QueryKit is available by checking your project file:
+
+```xml
+<ItemGroup>
+  <PackageReference Include="QueryKit" Version="1.13.0" />
+</ItemGroup>
+```
+
+You can also verify by adding a using statement in your code:
+
+```csharp
+using QueryKit;
+```
+
+## Usage with Entity Framework Core
+
+QueryKit works seamlessly with Entity Framework Core. No additional packages are required:
+
+```csharp
+using Microsoft.EntityFrameworkCore;
+using QueryKit;
+
+public class MyDbContext : DbContext
+{
+    public DbSet<Person> People { get; set; }
+}
+
+// Use QueryKit extension methods on DbSet
+var filteredPeople = await dbContext.People
+    .ApplyQueryKitFilter("""Age > 18""")
+    .ToListAsync();
+```
+
+## Usage with In-Memory Collections
+
+QueryKit also works with in-memory collections (`IEnumerable<T>`):
+
+```csharp
+using QueryKit;
+
+var people = new List<Person>
+{
+    new Person { FirstName = "John", Age = 30 },
+    new Person { FirstName = "Jane", Age = 25 }
+};
+
+var filtered = people
+    .ApplyQueryKitFilter("""FirstName == \"Jane\"""")
+    .ToList();
+```
+
+## No Configuration Required
+
+<Note>
+  Unlike some other libraries, QueryKit requires **no global setup or service registration**. Simply install the package and start using the extension methods wherever you need them.
+</Note>
+
+There's no need to:
+- Register services in your DI container
+- Configure global settings at startup
+- Set up middleware or filters
+
+Just install and use!
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+    Learn how to filter and sort data with QueryKit in under 5 minutes
+  </Card>
+  
+  <Card title="View on GitHub" icon="github" href="https://github.com/pdevito3/QueryKit">
+    Check out the source code and examples on GitHub
+  </Card>
+</CardGroup>

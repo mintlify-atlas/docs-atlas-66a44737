@@ -1,0 +1,115 @@
+---
+title: Property Settings
+description: Configure property aliases, filtering, and sorting behavior for your QueryKit queries
+---
+
+Property settings allow you to customize how QueryKit handles individual properties on your entities. You can create custom aliases, control filtering and sorting permissions, and configure other property-specific behaviors.
+
+## Basic Configuration
+
+Property settings are configured through the `QueryKitConfiguration` using the `Property<TModel>()` method:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first");
+});
+```
+
+## HasQueryName
+
+Create a custom alias for a property to use in filter expressions. This is useful when you want to expose a different name to API consumers or use shorter names in queries.
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<SpecialPerson>(x => x.FirstName)
+        .HasQueryName("first");
+});
+
+var input = """first == "Jane" || Age > 10""";
+var filterExpression = FilterParser.ParseFilter<SpecialPerson>(input, config);
+```
+
+In this example, you can use `first` in your filter string instead of `FirstName`.
+
+## PreventFilter
+
+Prevent filtering on a specific property. This is useful for sensitive data or properties that should only be used for sorting or display purposes.
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<SpecialPerson>(x => x.Age)
+        .PreventFilter();
+});
+
+// This will throw an exception
+var input = """Age > 10""";
+```
+
+When `PreventFilter()` is applied, any attempt to filter on that property will result in an error.
+
+## PreventSort
+
+Prevent sorting on a specific property. This is useful for properties that are expensive to sort or should not be used as sort criteria.
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Product>(x => x.Description)
+        .PreventSort();
+});
+
+// This will throw an exception
+var sortInput = "Description asc";
+var sortExpression = SortParser.ParseSort<Product>(sortInput, config);
+```
+
+## Combining Settings
+
+You can chain multiple settings together for a single property:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<User>(x => x.EmailAddress)
+        .HasQueryName("email")
+        .PreventSort();
+        
+    config.Property<User>(x => x.InternalId)
+        .PreventFilter()
+        .PreventSort();
+});
+```
+
+## Use Cases
+
+### API-Friendly Names
+
+Use shorter or more intuitive names for API consumers:
+
+```csharp
+config.Property<Customer>(x => x.PrimaryContactEmailAddress)
+    .HasQueryName("email");
+```
+
+### Security and Privacy
+
+Prevent filtering on sensitive fields:
+
+```csharp
+config.Property<Employee>(x => x.SocialSecurityNumber)
+    .PreventFilter()
+    .PreventSort();
+```
+
+### Performance Optimization
+
+Prevent sorting on large text fields or computed properties:
+
+```csharp
+config.Property<Article>(x => x.Content)
+    .PreventSort();
+```

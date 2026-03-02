@@ -1,0 +1,254 @@
+---
+title: Custom Operators
+description: Customize comparison and logical operators to match your API style
+---
+
+QueryKit allows you to customize the comparison and logical operators used in filter expressions. This is useful for matching existing API conventions, improving readability, or adapting to specific use cases.
+
+## Basic Configuration
+
+Custom operators are configured through the `QueryKitConfiguration` settings:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.EqualsOperator = "@@$";
+    config.CaseInsensitiveAppendix = "$";
+    config.AndOperator = "and";
+});
+```
+
+<Note>
+**Important**: Spaces must be used around custom comparison operators.
+
+- `Title @@$ "titilating"` ✅ Correct
+- `Title@@$"titilating"` ❌ Incorrect
+</Note>
+
+## Available Comparison Operators
+
+You can customize any of the following comparison operators:
+
+### Equality Operators
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.EqualsOperator = "eq";           // Default: ==
+    config.NotEqualsOperator = "neq";       // Default: !=
+});
+
+var input = """Title eq "Pancakes" """;
+```
+
+### Comparison Operators
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.GreaterThanOperator = "gt";              // Default: >
+    config.GreaterThanOrEqualOperator = "gte";      // Default: >=
+    config.LessThanOperator = "lt";                 // Default: <
+    config.LessThanOrEqualOperator = "lte";         // Default: <=
+});
+
+var input = """Rating gt 10""";
+```
+
+### String Operators
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.ContainsOperator = "ct";             // Default: @=
+    config.StartsWithOperator = "sw";           // Default: _=
+    config.EndsWithOperator = "ew";             // Default: _-=
+    config.NotContainsOperator = "nct";         // Default: !@=
+    config.NotStartsWithOperator = "nsw";       // Default: !_=
+    config.NotEndsWithOperator = "new";         // Default: !_-=
+});
+
+var input = """Title ct "cake" """;
+```
+
+## Logical Operators
+
+Customize the logical operators that combine filter conditions:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.AndOperator = "and";     // Default: &&
+    config.OrOperator = "or";       // Default: ||
+});
+
+var input = """Title eq "Pancakes" and Rating gt 10""";
+```
+
+## Case-Insensitive Appendix
+
+The case-insensitive appendix is added to operators to make them case-insensitive:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.CaseInsensitiveAppendix = "i";  // Default: *
+});
+
+// With default: Title ==* "pancakes"
+// With custom:  Title ==i "pancakes"
+var input = """Title eqi "pancakes" """;
+```
+
+## Complete Custom Configuration
+
+Here's an example with all comparison and logical operators customized:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.EqualsOperator = "eq";
+    config.NotEqualsOperator = "neq";
+    config.GreaterThanOperator = "gt";
+    config.GreaterThanOrEqualOperator = "gte";
+    config.LessThanOperator = "lt";
+    config.LessThanOrEqualOperator = "lte";
+    config.ContainsOperator = "ct";
+    config.StartsWithOperator = "sw";
+    config.EndsWithOperator = "ew";
+    config.NotContainsOperator = "nct";
+    config.NotStartsWithOperator = "nsw";
+    config.NotEndsWithOperator = "new";
+    config.AndOperator = "and";
+    config.OrOperator = "or";
+    config.CaseInsensitiveAppendix = "i";
+});
+
+var input = """Title eqi "Pancakes" and Rating gt 10""";
+var filterExpression = FilterParser.ParseFilter<Recipe>(input, config);
+```
+
+## Base Configuration Class
+
+For consistent operator usage across your application, create a base configuration class:
+
+```csharp
+public class CustomQueryKitConfiguration : QueryKitConfiguration
+{
+    public CustomQueryKitConfiguration(Action<QueryKitSettings>? configureSettings = null)
+        : base(settings => 
+        {
+            settings.EqualsOperator = "eq";
+            settings.NotEqualsOperator = "neq";
+            settings.GreaterThanOperator = "gt";
+            settings.GreaterThanOrEqualOperator = "gte";
+            settings.LessThanOperator = "lt";
+            settings.LessThanOrEqualOperator = "lte";
+            settings.ContainsOperator = "ct";
+            settings.StartsWithOperator = "sw";
+            settings.EndsWithOperator = "ew";
+            settings.NotContainsOperator = "nct";
+            settings.NotStartsWithOperator = "nsw";
+            settings.NotEndsWithOperator = "new";
+            settings.AndOperator = "and";
+            settings.OrOperator = "or";
+            settings.CaseInsensitiveAppendix = "i";
+
+            configureSettings?.Invoke(settings);
+        })
+    {
+    }
+}
+```
+
+Then use it throughout your application:
+
+```csharp
+var input = """Title eqi "Pancakes" and Rating gt 10""";
+var config = new CustomQueryKitConfiguration();
+var filterExpression = FilterParser.ParseFilter<Recipe>(input, config);
+```
+
+You can still add property-specific settings:
+
+```csharp
+var config = new CustomQueryKitConfiguration(settings =>
+{
+    settings.Property<Recipe>(x => x.Title)
+        .HasQueryName("name");
+});
+
+var input = """name eqi "Pancakes" and Rating gt 10""";
+```
+
+## Use Cases
+
+### OData-Style Operators
+
+Match OData conventions:
+
+```csharp
+config.EqualsOperator = "eq";
+config.NotEqualsOperator = "ne";
+config.GreaterThanOperator = "gt";
+config.AndOperator = "and";
+config.OrOperator = "or";
+
+var input = """name eq "John" and age gt 25""";
+```
+
+### SQL-Style Operators
+
+Use SQL-like keywords:
+
+```csharp
+config.ContainsOperator = "LIKE";
+config.AndOperator = "AND";
+config.OrOperator = "OR";
+
+var input = """Title LIKE "Pancake" AND Rating > 4""";
+```
+
+### Word-Based Operators
+
+Use plain English words for better readability:
+
+```csharp
+config.EqualsOperator = "equals";
+config.GreaterThanOperator = "greater than";
+config.ContainsOperator = "contains";
+config.AndOperator = "and";
+config.OrOperator = "or";
+
+var input = """Title contains "Pancake" and Rating greater than 4""";
+```
+
+## Default Operators Reference
+
+For reference, here are QueryKit's default operators:
+
+| Operator Type | Default Symbol | Purpose |
+|--------------|----------------|----------|
+| Equals | `==` | Equality comparison |
+| Not Equals | `!=` | Inequality comparison |
+| Greater Than | `>` | Greater than comparison |
+| Greater Than or Equal | `>=` | Greater than or equal comparison |
+| Less Than | `<` | Less than comparison |
+| Less Than or Equal | `<=` | Less than or equal comparison |
+| Contains | `@=` | String contains |
+| Starts With | `_=` | String starts with |
+| Ends With | `_-=` | String ends with |
+| Not Contains | `!@=` | String does not contain |
+| Not Starts With | `!_=` | String does not start with |
+| Not Ends With | `!_-=` | String does not end with |
+| And | `&&` | Logical AND |
+| Or | `||` | Logical OR |
+| Case-Insensitive | `*` | Appended to make operator case-insensitive |
+
+## Best Practices
+
+1. **Be Consistent**: Once you choose a style, use it consistently across your API
+2. **Document Your Choices**: Make sure API consumers know which operators are available
+3. **Consider Readability**: Choose operators that make sense to your audience
+4. **Test Thoroughly**: Ensure all operator combinations work as expected
+5. **Use Base Classes**: Create reusable configuration classes for consistency

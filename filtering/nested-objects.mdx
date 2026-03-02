@@ -1,0 +1,380 @@
+---
+title: "Nested Objects"
+description: "Filter on properties of nested objects and child entities in QueryKit"
+---
+
+QueryKit supports filtering on properties of nested objects and child entities using dot notation. This allows you to traverse object relationships and filter based on properties at any level of nesting.
+
+## Basic Nested Property Syntax
+
+Use dot notation to access properties of nested objects:
+
+```csharp
+// Filter by nested property
+var input = """Author.Name == "John Doe" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Filter by deeply nested property
+var input = """Email.Value _= "hello@gmail.com" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Entity Structure Example
+
+```csharp
+public class Book
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; }
+    public decimal Rating { get; set; }
+    public Author Author { get; set; }  // Nested object
+    public Publisher Publisher { get; set; }  // Nested object
+}
+
+public class Author
+{
+    public string Name { get; set; }
+    public int Age { get; set; }
+    public decimal Score { get; set; }
+    public Address Address { get; set; }  // Nested within nested
+}
+
+public class Publisher
+{
+    public string Name { get; set; }
+    public string Country { get; set; }
+}
+
+public class Address
+{
+    public string City { get; set; }
+    public string Country { get; set; }
+}
+```
+
+## Single-Level Nesting
+
+Filter by properties one level deep:
+
+```csharp
+// Author name
+var input = """Author.Name == "Stephen King" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Author age
+var input = "Author.Age > 50";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Publisher country
+var input = """Publisher.Country == "USA" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+## Multi-Level Nesting
+
+Traverse multiple levels of nested objects:
+
+```csharp
+// Two levels deep
+var input = """Author.Address.City == "New York" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Three levels deep
+var input = """Order.Customer.Address.Country == "Canada" """;
+var orders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+## String Operations on Nested Properties
+
+Use all string operators with nested properties:
+
+```csharp
+// Contains (case-insensitive)
+var input = """Author.Name @=* "king" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Starts with
+var input = """Publisher.Name _= "Penguin" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Ends with
+var input = """Author.Email.Value _-= "@gmail.com" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Combining Nested and Root Properties
+
+Mix nested and root property filters:
+
+```csharp
+// Root and nested properties
+var input = """Title @=* "dragon" && Author.Name == "George R.R. Martin" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Multiple nested properties
+var input = """
+    Author.Name @=* "tolkien" && 
+    Publisher.Country == "UK" && 
+    Rating > 4.5
+""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+## Property-to-Property Comparisons with Nesting
+
+Compare nested properties to root properties or other nested properties:
+
+```csharp
+// Compare nested property to root property
+var input = """Author.Name == Title""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Compare nested properties
+var input = """Author.Age > MinimumAuthorAge""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Compare properties at same nesting level
+var input = """Author.FirstName == Author.LastName""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Complex Nested Examples
+
+### Multiple Nested Conditions
+
+```csharp
+var input = """
+    (Author.Name @=* "martin" || Author.Name @=* "tolkien") && 
+    Publisher.Country == "USA" && 
+    Author.Age > 40 && 
+    Rating >= 4.0
+""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+### Deep Nesting with Logic
+
+```csharp
+var input = """
+    Author.Address.Country == "UK" && 
+    (Publisher.Address.City == "London" || Publisher.Address.City == "Edinburgh") && 
+    PublishedDate >= "2020-01-01"
+""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+### Nested Property List Grouping
+
+```csharp
+// Search across nested properties
+var input = """(Author.Name, Author.Email, Title) @=* "john" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+## Practical Use Cases
+
+### E-Commerce: Customer Orders
+
+```csharp
+public class Order
+{
+    public Guid Id { get; set; }
+    public decimal Total { get; set; }
+    public Customer Customer { get; set; }
+    public ShippingAddress ShippingAddress { get; set; }
+}
+
+// Orders from specific country
+var input = """Customer.Address.Country == "Canada" """;
+var canadianOrders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+
+// High-value orders from premium customers
+var input = """
+    Total > 1000 && 
+    Customer.MembershipLevel == 3 && 
+    Customer.Address.Country == "USA"
+""";
+var premiumOrders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+### Content Management: Articles
+
+```csharp
+public class Article
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; }
+    public Author Author { get; set; }
+    public Category Category { get; set; }
+}
+
+// Articles by verified authors in specific category
+var input = """
+    Author.IsVerified == true && 
+    Author.Rating > 4.0 && 
+    Category.Name == "Technology"
+""";
+var articles = _dbContext.Articles.ApplyQueryKitFilter(input).ToList();
+```
+
+### HR System: Employees
+
+```csharp
+public class Employee
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public Department Department { get; set; }
+    public Manager Manager { get; set; }
+}
+
+// Employees in specific department with manager approval
+var input = """
+    Department.Name == "Engineering" && 
+    Department.Location.City == "San Francisco" && 
+    Manager.ApprovalLevel >= 3
+""";
+var employees = _dbContext.Employees.ApplyQueryKitFilter(input).ToList();
+```
+
+## Null Handling
+
+QueryKit handles null nested objects gracefully:
+
+```csharp
+// If Author is null, this filter will exclude the record
+var input = """Author.Name == "John Doe" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Explicitly check for null
+var input = """Author != null && Author.Name == "John Doe" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Filter for null nested objects
+var input = "Author == null";
+var booksWithoutAuthor = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+<Note>
+When a nested object is null, any filter on its properties will automatically exclude that record unless you explicitly check for null.
+</Note>
+
+## Using with Collections
+
+Nested properties work with collection filtering:
+
+```csharp
+public class Recipe
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; }
+    public List<Ingredient> Ingredients { get; set; }
+}
+
+public class Ingredient
+{
+    public string Name { get; set; }
+    public Supplier Supplier { get; set; }
+}
+
+// Filter by nested property in collection
+var input = """Ingredients.Supplier.Country == "Italy" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Multiple nested collection conditions
+var input = """
+    Ingredients.Supplier.Country == "Italy" && 
+    Ingredients.Supplier.Rating > 4.5
+""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+## Configuration with Nested Properties
+
+You can create custom query names for nested properties:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Alias nested property
+    config.Property<Book>(x => x.Author.Name)
+        .HasQueryName("authorName");
+    
+    // Alias deeply nested property
+    config.Property<Book>(x => x.Author.Address.City)
+        .HasQueryName("authorCity");
+});
+
+// Use aliases in filters
+var input = """authorName == "John Doe" && authorCity == "New York" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input, config).ToList();
+```
+
+## Performance Considerations
+
+### Include Related Data
+
+When filtering by nested properties, ensure the related data is included:
+
+```csharp
+// Include related entities for better performance
+var books = _dbContext.Books
+    .Include(b => b.Author)
+    .Include(b => b.Publisher)
+    .ApplyQueryKitFilter("""Author.Name == "John Doe" """)
+    .ToList();
+```
+
+### Index Nested Properties
+
+For frequently filtered nested properties, consider adding database indexes:
+
+```csharp
+// In your DbContext configuration
+modelBuilder.Entity<Book>()
+    .HasIndex(b => b.Author.Name);
+
+modelBuilder.Entity<Author>()
+    .HasIndex(a => a.Address.Country);
+```
+
+<Warning>
+Deeply nested property filters can impact query performance. Consider the depth of nesting and add appropriate database indexes for frequently queried nested properties.
+</Warning>
+
+## SQL Translation
+
+Nested property filters translate to SQL joins:
+
+```csharp
+// This QueryKit filter:
+var input = """Author.Name == "John Doe" && Publisher.Country == "USA" """;
+
+// Translates to SQL similar to:
+// SELECT * FROM Books b
+// INNER JOIN Authors a ON b.AuthorId = a.Id
+// INNER JOIN Publishers p ON b.PublisherId = p.Id
+// WHERE a.Name = 'John Doe' AND p.Country = 'USA'
+```
+
+## Best Practices
+
+1. **Use meaningful navigation properties** - Name your relationships clearly
+2. **Include related data** - Use `.Include()` when querying
+3. **Add indexes** - Index frequently filtered nested properties
+4. **Limit nesting depth** - Avoid excessive levels of nesting
+5. **Handle nulls explicitly** - Check for null when appropriate
+6. **Use aliases for complex paths** - Create query name aliases for deeply nested properties
+
+```csharp
+// ✅ Good - clear, indexed, included
+var books = _dbContext.Books
+    .Include(b => b.Author)
+    .ApplyQueryKitFilter("""Author.Name == "John Doe" """)
+    .ToList();
+
+// ❌ Avoid - too deeply nested, no includes
+var books = _dbContext.Books
+    .ApplyQueryKitFilter("Author.Publisher.Parent.Company.Address.Country == 'USA'")
+    .ToList();
+```

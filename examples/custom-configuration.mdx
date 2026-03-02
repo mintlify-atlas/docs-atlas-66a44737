@@ -1,0 +1,542 @@
+---
+title: Custom Configuration
+description: Property aliases, derived properties, custom operators, and advanced QueryKit configuration
+---
+
+## Overview
+
+QueryKit provides extensive configuration options to customize property names, create derived properties, define custom operations, and modify operator syntax to fit your application's needs.
+
+## Property Aliases
+
+Map friendly query names to your entity properties:
+
+### Basic Property Aliases
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName).HasQueryName("first");
+    config.Property<Person>(x => x.LastName).HasQueryName("last");
+});
+
+var input = """first == "Jane" && last == "Smith" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Nested Property Aliases
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.PhysicalAddress.State).HasQueryName("state");
+    config.Property<Person>(x => x.Email.Value).HasQueryName("email");
+});
+
+var input = """state == "CA" && email @=* "gmail.com" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Collection Property Aliases
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.Property<Recipe>(x => x.Ingredients
+        .SelectMany(y => y.Preparations)
+        .Select(y => y.Text))
+        .HasQueryName("preparations");
+});
+
+var input = """preparations == "dice" """;
+var recipes = _dbContext.Recipes
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+## Derived Properties
+
+Create computed properties from existing entity properties:
+
+### String Concatenation
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+        .HasQueryName("fullname");
+});
+
+var input = """fullname @=* "john doe" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Boolean Logic
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.Age >= 18 && p.FirstName == "John")
+        .HasQueryName("adult_johns");
+});
+
+var input = """adult_johns == true""";
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Arithmetic Derived Properties
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Product>(p => p.Price - p.Cost)
+        .HasQueryName("profit");
+    
+    config.DerivedProperty<Product>(p => (p.Price - p.Cost) / p.Price)
+        .HasQueryName("margin");
+});
+
+var input = """profit > 100 && margin > 0.2""";
+var products = _dbContext.Products
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+## Custom Operations
+
+Define complex business logic as reusable operations:
+
+### Basic Custom Operation
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Check if a book sold more than X units in the last 10 days
+    config.CustomOperation<Book>((x, op, value) => 
+        x.Orders.Where(y => y.OrderDate > DateTime.UtcNow.AddDays(-10))
+               .Sum(o => o.Quantity) > (int)value)
+        .HasQueryName("SoldUnitsMoreThan10Days");
+});
+
+var input = """SoldUnitsMoreThan10Days > 100""";
+var books = _dbContext.Books
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### VIP Customer Detection
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.CustomOperation<Customer>((x, op, value) => 
+        (bool)value ? 
+            (x.TotalPurchases > 10000 && x.AccountAge > 365) :
+            !(x.TotalPurchases > 10000 && x.AccountAge > 365))
+        .HasQueryName("isVipCustomer");
+});
+
+var input = """isVipCustomer == true""";
+var customers = _dbContext.Customers
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Date-Based Custom Operation
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.CustomOperation<Order>((x, op, value) => 
+        x.OrderDate > (DateTime)value)
+        .HasQueryName("isAfterDate");
+});
+
+var input = """isAfterDate == "2023-06-15T00:00:00Z" """;
+var orders = _dbContext.Orders
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Performance Metrics
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Average rating above threshold
+    config.CustomOperation<Product>((x, op, value) =>
+        x.Reviews.Average(r => r.Rating) > (decimal)value)
+        .HasQueryName("avgRatingAbove");
+    
+    // Active inventory check
+    config.CustomOperation<Product>((x, op, value) =>
+        x.Stock > 0 && x.Orders.Where(o => o.OrderDate > DateTime.UtcNow.AddDays(-30))
+            .Count() > (int)value)
+        .HasQueryName("activeWithOrders");
+});
+
+var input = """avgRatingAbove > 4.5 && activeWithOrders > 10""";
+var products = _dbContext.Products
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+## Property Prevention
+
+Prevent filtering or sorting on specific properties:
+
+### Prevent Filtering
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.SocialSecurityNumber)
+        .PreventFilter();
+    
+    config.Property<Person>(x => x.Salary)
+        .PreventFilter();
+});
+
+// These filters will be ignored (evaluated as true)
+var input = """SocialSecurityNumber == "123-45-6789" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList(); // Returns all people
+```
+
+### Prevent Sorting
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first")
+        .PreventSort();
+});
+
+// Sorting on this property will throw an exception
+var input = "first asc";
+var act = () => _dbContext.People
+    .ApplyQueryKitSort(input, config)
+    .ToList();
+// Throws exception
+```
+
+### Combined Prevention
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.Password)
+        .PreventFilter()
+        .PreventSort();
+});
+```
+
+## Custom Operators
+
+Customize the operator syntax to match your preferences:
+
+### Custom Operator Configuration
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.EqualsOperator = "eq";
+    config.NotEqualsOperator = "neq";
+    config.GreaterThanOperator = "gt";
+    config.GreaterThanOrEqualOperator = "gte";
+    config.LessThanOperator = "lt";
+    config.LessThanOrEqualOperator = "lte";
+    config.ContainsOperator = "ct";
+    config.StartsWithOperator = "sw";
+    config.EndsWithOperator = "ew";
+    config.NotContainsOperator = "nct";
+    config.AndOperator = "and";
+    config.OrOperator = "or";
+    config.CaseInsensitiveAppendix = "i";
+});
+
+var input = """Title eqi "Pancakes" and Rating gt 10""";
+var recipes = _dbContext.Recipes
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+**Important:** When using custom operators, spaces must be used around the comparison operator:
+- ✅ `Title eq "value"`
+- ❌ `Title eq"value"`
+
+### Global Custom Configuration
+
+Create a base configuration for reuse across your application:
+
+```csharp
+public class CustomQueryKitConfiguration : QueryKitConfiguration
+{
+    public CustomQueryKitConfiguration(Action<QueryKitSettings>? configureSettings = null)
+        : base(settings => 
+        {
+            // Set defaults
+            settings.EqualsOperator = "eq";
+            settings.NotEqualsOperator = "neq";
+            settings.GreaterThanOperator = "gt";
+            settings.GreaterThanOrEqualOperator = "gte";
+            settings.LessThanOperator = "lt";
+            settings.LessThanOrEqualOperator = "lte";
+            settings.ContainsOperator = "ct";
+            settings.StartsWithOperator = "sw";
+            settings.EndsWithOperator = "ew";
+            settings.NotContainsOperator = "nct";
+            settings.NotStartsWithOperator = "nsw";
+            settings.NotEndsWithOperator = "new";
+            settings.AndOperator = "and";
+            settings.OrOperator = "or";
+            settings.CaseInsensitiveAppendix = "i";
+
+            // Allow additional customization
+            configureSettings?.Invoke(settings);
+        })
+    {
+    }
+}
+
+// Usage
+var input = """Title eqi "Pancakes" and Rating gt 10""";
+var config = new CustomQueryKitConfiguration();
+var recipes = _dbContext.Recipes
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+## Unknown Properties
+
+Control how QueryKit handles unrecognized properties:
+
+```csharp
+// Default: throws UnknownFilterPropertyException
+var input = """NonExistentProperty == "value" """;
+var act = () => _dbContext.People.ApplyQueryKitFilter(input).ToList();
+// Throws exception
+
+// Allow unknown properties (ignores them)
+var config = new QueryKitConfiguration(config =>
+{
+    config.AllowUnknownProperties = true;
+});
+
+var input = """NonExistentProperty == "value" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList(); // Returns all people
+```
+
+## Case-Insensitive Comparison Mode
+
+Optimize case-insensitive queries for your database schema:
+
+### Global Configuration
+
+```csharp
+// Default: uses ToLower() / LOWER()
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Lower;
+});
+
+// Use ToUpper() / UPPER() for uppercase-normalized data
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+});
+
+var input = """Email ==* "JOHN@EXAMPLE.COM" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Per-Property Override
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Lower; // Global default
+    
+    // Override for specific property
+    settings.Property<Person>(x => x.Email)
+        .HasCaseInsensitiveMode(CaseInsensitiveMode.Upper);
+});
+```
+
+This is useful when:
+- Data is stored in uppercase for consistency
+- Database indexes are defined on uppercase values
+- You need SARGable queries for performance
+
+## Max Property Depth
+
+Limit nested property access for security and performance:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.MaxPropertyDepth = 2; // Allow up to 2 levels of nesting
+});
+
+// These work (within depth limit):
+// "Author.Name" (depth 1)
+// "Author.Address.City" (depth 2)
+
+// This throws QueryKitPropertyDepthExceededException:
+// "Author.Address.Country.Name" (depth 3)
+
+var input = """Author.Address.City == "New York" """;
+var books = _dbContext.Books
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+### Per-Property Depth Override
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.MaxPropertyDepth = 1; // Global limit
+    
+    // Allow specific property to go deeper
+    config.Property<Book>(x => x.Author)
+        .HasMaxDepth(3);
+});
+
+// "Title" works (depth 0)
+// "Author.Name" works (depth 1)
+// "Author.Address.City" works (depth 2, uses per-property override)
+// "Publisher.Address.City" throws (depth 2, exceeds global limit of 1)
+```
+
+## Complete Configuration Example
+
+Put it all together for a comprehensive setup:
+
+```csharp
+public class ProductQueryKitConfiguration : QueryKitConfiguration
+{
+    public ProductQueryKitConfiguration() : base(settings =>
+    {
+        // Property aliases
+        settings.Property<Product>(x => x.Name).HasQueryName("name");
+        settings.Property<Product>(x => x.Price).HasQueryName("price");
+        settings.Property<Product>(x => x.Category.Name).HasQueryName("category");
+        
+        // Derived properties
+        settings.DerivedProperty<Product>(p => p.Price - p.Cost)
+            .HasQueryName("profit");
+        settings.DerivedProperty<Product>(p => (p.Price - p.Cost) / p.Price)
+            .HasQueryName("margin");
+        
+        // Custom operations
+        settings.CustomOperation<Product>((x, op, value) =>
+            x.Reviews.Average(r => r.Rating) > (decimal)value)
+            .HasQueryName("avgRating");
+        
+        // Prevent sensitive data filtering
+        settings.Property<Product>(x => x.InternalCostCode).PreventFilter();
+        
+        // Security settings
+        settings.MaxPropertyDepth = 2;
+        settings.AllowUnknownProperties = false;
+        
+        // Case sensitivity
+        settings.CaseInsensitiveComparison = CaseInsensitiveMode.Lower;
+        settings.Property<Product>(x => x.SKU)
+            .HasCaseInsensitiveMode(CaseInsensitiveMode.Upper);
+    })
+    {
+    }
+}
+
+// Usage
+var config = new ProductQueryKitConfiguration();
+var input = """
+    category == "Electronics" && 
+    profit > 100 && 
+    margin > 0.2 && 
+    avgRating > 4.5
+""";
+
+var products = _dbContext.Products
+    .ApplyQueryKitFilter(input, config)
+    .ToList();
+```
+
+## Configuration Best Practices
+
+### 1. Use Meaningful Aliases
+
+```csharp
+// Good: Clear and intuitive
+config.Property<Person>(x => x.FirstName).HasQueryName("firstName");
+config.Property<Person>(x => x.DateOfBirth).HasQueryName("birthDate");
+
+// Avoid: Cryptic abbreviations
+config.Property<Person>(x => x.FirstName).HasQueryName("fn");
+config.Property<Person>(x => x.DateOfBirth).HasQueryName("dob");
+```
+
+### 2. Group Related Configuration
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    // Personal information
+    settings.Property<Person>(x => x.FirstName).HasQueryName("firstName");
+    settings.Property<Person>(x => x.LastName).HasQueryName("lastName");
+    settings.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+        .HasQueryName("fullName");
+    
+    // Address information
+    settings.Property<Person>(x => x.PhysicalAddress.City).HasQueryName("city");
+    settings.Property<Person>(x => x.PhysicalAddress.State).HasQueryName("state");
+    
+    // Security
+    settings.Property<Person>(x => x.SSN).PreventFilter();
+    settings.Property<Person>(x => x.Salary).PreventFilter();
+});
+```
+
+### 3. Create Domain-Specific Configurations
+
+```csharp
+public class CustomerConfiguration : QueryKitConfiguration
+{
+    public CustomerConfiguration() : base(settings =>
+    {
+        // Customer-specific setup
+    })
+    { }
+}
+
+public class OrderConfiguration : QueryKitConfiguration
+{
+    public OrderConfiguration() : base(settings =>
+    {
+        // Order-specific setup
+    })
+    { }
+}
+```
+
+## Next Steps
+
+- Review [Basic Filtering](/examples/basic-filtering) for fundamental filter patterns
+- See [Complex Queries](/examples/complex-queries) for advanced filtering techniques
+- Explore [EF Core Integration](/examples/ef-core-integration) for database-specific features

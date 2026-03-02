@@ -1,0 +1,486 @@
+---
+title: EF Core Integration
+description: Using QueryKit with DbContext, projections, and SQL queries
+---
+
+## Overview
+
+QueryKit integrates seamlessly with Entity Framework Core, translating filters to efficient SQL queries. This guide covers working with DbContext, projections, and advanced EF Core scenarios.
+
+## Basic DbContext Usage
+
+Apply filters directly to your DbSet:
+
+```csharp
+public class ApplicationDbContext : DbContext
+{
+    public DbSet<Person> People { get; set; }
+    public DbSet<Recipe> Recipes { get; set; }
+}
+
+// Simple filtering
+var filterInput = """FirstName == "Jane" && Age > 10""";
+var people = _dbContext.People
+    .ApplyQueryKitFilter(filterInput)
+    .ToListAsync();
+
+// With sorting
+var people = _dbContext.People
+    .ApplyQueryKitFilter("""FirstName == "Jane" """)
+    .ApplyQueryKitSort("Age desc")
+    .ToListAsync();
+```
+
+## Working with Includes
+
+QueryKit works naturally with EF Core's `Include()` for eager loading:
+
+```csharp
+// Filter with included navigation properties
+var input = """Author.Name == "John Smith" """;
+var recipes = await _dbContext.Recipes
+    .Include(x => x.Author)
+    .ApplyQueryKitFilter(input)
+    .ToListAsync();
+
+// Multiple includes
+var recipes = await _dbContext.Recipes
+    .Include(x => x.Author)
+    .Include(x => x.Ingredients)
+    .ApplyQueryKitFilter("""Ingredients.Name == "flour" """)
+    .ToListAsync();
+
+// Nested includes
+var recipes = await _dbContext.Recipes
+    .Include(x => x.Ingredients)
+        .ThenInclude(i => i.Preparations)
+    .ApplyQueryKitFilter("""Ingredients.Preparations.Text == "dice" """)
+    .ToListAsync();
+```
+
+## Projections
+
+Filter on projected DTOs for optimized queries:
+
+### Basic Projection
+
+```csharp
+public class RecipeDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; }
+    public string AuthorName { get; set; }
+}
+
+var input = """title == "Chocolate Cake" """;
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<RecipeDto>(x => x.Title).HasQueryName("title");
+});
+
+var recipes = await _dbContext.Recipes
+    .Include(x => x.Author)
+    .Select(x => new RecipeDto
+    {
+        Id = x.Id,
+        Title = x.Title,
+        AuthorName = x.Author.Name
+    })
+    .ApplyQueryKitFilter(input, config)
+    .ToListAsync();
+```
+
+### Filtering on Nested Projection Properties
+
+```csharp
+var input = """author == "John Smith" """;
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<RecipeDto>(x => x.AuthorName).HasQueryName("author");
+});
+
+var recipes = await _dbContext.Recipes
+    .Include(x => x.Author)
+    .Select(x => new RecipeDto
+    {
+        Id = x.Id,
+        Title = x.Title,
+        AuthorName = x.Author.Name
+    })
+    .ApplyQueryKitFilter(input, config)
+    .ToListAsync();
+```
+
+### Complex Projection with Concatenated Fields
+
+```csharp
+public class RecipeDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; }
+    public string AuthorName { get; set; }
+    public string AuthorInfo { get; set; } // Concatenated field
+}
+
+var input = """info @=* "john" """;
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<RecipeDto>(x => x.AuthorInfo).HasQueryName("info");
+});
+
+var recipes = await _dbContext.Recipes
+    .Include(x => x.Author)
+    .Select(x => new RecipeDto
+    {
+        Id = x.Id,
+        Title = x.Title,
+        AuthorName = x.Author.Name,
+        AuthorInfo = x.Author.Name + " - " + x.Author.InternalIdentifier
+    })
+    .ApplyQueryKitFilter(input, config)
+    .ToListAsync();
+```
+
+## Raw SQL Queries
+
+QueryKit can filter results from raw SQL queries via `SqlQueryRaw`:
+
+```csharp
+public class StudentEnrollmentDto
+{
+    public Guid Id { get; set; }
+    public string StudentFirstName { get; set; }
+    public string StudentLastName { get; set; }
+    public string StudentFullName { get; set; }
+    public int StudentAge { get; set; }
+    public Guid CourseId { get; set; }
+    public string CourseName { get; set; }
+    public DateTime EnrolledOn { get; set; }
+    public DateTime? CourseStartDate { get; set; }
+}
+
+// Define raw SQL query
+var sql = $"""
+SELECT
+    e.id as "Id",
+    COALESCE(s.first_name, '') as "StudentFirstName",
+    COALESCE(s.last_name, '') as "StudentLastName",
+    COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '') as "StudentFullName",
+    s.age as "StudentAge",
+    e.course_id as "CourseId",
+    c.name as "CourseName",
+    e.enrolled_on as "EnrolledOn",
+    c.start_date as "CourseStartDate"
+FROM enrollments e
+LEFT JOIN students s ON e.student_id = s.id
+LEFT JOIN courses c ON e.course_id = c.id
+WHERE e.is_deleted = false
+""";
+
+var projection = _dbContext.Database.SqlQueryRaw<StudentEnrollmentDto>(sql);
+
+// Configure QueryKit for the projection
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<StudentEnrollmentDto>(x => x.StudentFirstName).HasQueryName("studentFirstName");
+    config.Property<StudentEnrollmentDto>(x => x.StudentLastName).HasQueryName("studentLastName");
+    config.Property<StudentEnrollmentDto>(x => x.StudentFullName).HasQueryName("studentName");
+    config.Property<StudentEnrollmentDto>(x => x.StudentAge).HasQueryName("studentAge");
+    config.Property<StudentEnrollmentDto>(x => x.CourseName).HasQueryName("courseName");
+});
+
+// Apply filtering and sorting
+var queryKitData = new QueryKitData
+{
+    Filters = """studentName @=* "john" && studentAge > 18""",
+    SortOrder = "studentName asc, enrolledOn desc",
+    Configuration = config
+};
+
+var results = await projection
+    .ApplyQueryKit(queryKitData)
+    .ToListAsync();
+```
+
+## Aggregate Application
+
+Apply both filtering and sorting in one call:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName).HasQueryName("first");
+});
+
+var people = await _dbContext.People
+    .ApplyQueryKit(new QueryKitData() 
+    {
+        Filters = """first == "Jane" && Age > 10""",
+        SortOrder = "first, Age desc",
+        Configuration = config
+    })
+    .ToListAsync();
+```
+
+## Complex Types (EF Core 8+)
+
+QueryKit supports EF Core 8's ComplexProperty:
+
+```csharp
+public class Person
+{
+    public Guid Id { get; set; }
+    public EmailAddress Email { get; set; } // Complex property
+}
+
+public class EmailAddress
+{
+    public string Value { get; private set; }
+}
+
+// EF Core Configuration
+public class PersonConfiguration : IEntityTypeConfiguration<Person>
+{
+    public void Configure(EntityTypeBuilder<Person> builder)
+    {
+        builder.ComplexProperty(x => x.Email,
+            x => x.Property(y => y.Value)
+                .HasColumnName("email"));
+    }
+}
+
+// QueryKit usage - access nested property
+var input = """Email.Value == "hello@gmail.com" """;
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input)
+    .ToListAsync();
+
+// With configuration alias
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.Email.Value).HasQueryName("email");
+});
+
+var input = """email == "hello@gmail.com" """;
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToListAsync();
+```
+
+## HasConversion Support
+
+For properties using EF Core's `HasConversion`:
+
+```csharp
+// EF Core Configuration
+public class PersonConfiguration : IEntityTypeConfiguration<Person>
+{
+    public void Configure(EntityTypeBuilder<Person> builder)
+    {
+        builder.Property(x => x.Email)
+            .HasConversion(
+                x => x.Value, 
+                x => new EmailAddress(x)
+            )
+            .HasColumnName("email");
+    }
+}
+
+// QueryKit Configuration - use HasConversion<TTarget>()
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.Email)  // Point to Email, not Email.Value
+        .HasQueryName("email")
+        .HasConversion<string>(); // Specify conversion target type
+});
+
+// Now filter directly on the property
+var input = """email == "hello@gmail.com" """;
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToListAsync();
+```
+
+**Important:** When using `HasConversion` in EF Core, configure QueryKit using `x => x.Email`, NOT `x => x.Email.Value`.
+
+## Owned Entities
+
+QueryKit works with EF Core's OwnsOne and OwnsMany:
+
+```csharp
+// EF Core Configuration
+public class PersonConfiguration : IEntityTypeConfiguration<Person>
+{
+    public void Configure(EntityTypeBuilder<Person> builder)
+    {
+        builder.OwnsOne(x => x.PhysicalAddress, opts =>
+        {
+            opts.Property(x => x.State).HasColumnName("state");
+            opts.Property(x => x.City).HasColumnName("city");
+        }).Navigation(x => x.PhysicalAddress)
+            .IsRequired();
+    }
+}
+
+// Filter on owned entity properties
+var input = """PhysicalAddress.State == "CA" """;
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input)
+    .ToListAsync();
+
+// With alias
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.PhysicalAddress.State).HasQueryName("state");
+});
+
+var input = """state == "CA" """;
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input, config)
+    .ToListAsync();
+```
+
+## Soundex Support
+
+Use phonetic matching with database soundex functions:
+
+```csharp
+// DbContext Configuration
+public class ApplicationDbContext : DbContext
+{
+    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+        : base(options) { }
+    
+    [DbFunction(Name = "SOUNDEX", IsBuiltIn = true)]
+    public static string SoundsLike(string query) 
+        => throw new NotImplementedException();
+
+    public DbSet<Person> People { get; set; }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        // For PostgreSQL
+        modelBuilder.HasPostgresExtension("fuzzystrmatch");
+    }
+}
+
+// QueryKit usage
+var input = """LastName ~~ "devito" """; // Sounds like "devito"
+
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input, new QueryKitConfiguration(o =>
+    {
+        o.DbContextType = typeof(ApplicationDbContext);
+    }))
+    .ToListAsync();
+
+// Does not sound like
+var input = """LastName !~ "smith" """;
+var people = await _dbContext.People
+    .ApplyQueryKitFilter(input, new QueryKitConfiguration(o =>
+    {
+        o.DbContextType = typeof(ApplicationDbContext);
+    }))
+    .ToListAsync();
+```
+
+## Tracking vs No-Tracking
+
+QueryKit works with both tracking and no-tracking queries:
+
+```csharp
+// With tracking (default)
+var people = await _dbContext.People
+    .ApplyQueryKitFilter("""FirstName == "Jane" """)
+    .ToListAsync();
+
+// No-tracking for read-only scenarios
+var people = await _dbContext.People
+    .AsNoTracking()
+    .ApplyQueryKitFilter("""FirstName == "Jane" """)
+    .ToListAsync();
+```
+
+## Pagination
+
+Combine QueryKit with pagination:
+
+```csharp
+var pageNumber = 1;
+var pageSize = 20;
+
+var query = _dbContext.People
+    .ApplyQueryKitFilter("""Age > 18""")
+    .ApplyQueryKitSort("LastName asc, FirstName asc");
+
+var totalCount = await query.CountAsync();
+
+var people = await query
+    .Skip((pageNumber - 1) * pageSize)
+    .Take(pageSize)
+    .ToListAsync();
+
+var result = new
+{
+    TotalCount = totalCount,
+    PageNumber = pageNumber,
+    PageSize = pageSize,
+    Data = people
+};
+```
+
+## Soft Delete Filtering
+
+Combine QueryKit with global query filters:
+
+```csharp
+// DbContext configuration
+protected override void OnModelCreating(ModelBuilder modelBuilder)
+{
+    modelBuilder.Entity<Person>()
+        .HasQueryFilter(p => !p.IsDeleted);
+}
+
+// QueryKit automatically respects global filters
+var people = await _dbContext.People
+    .ApplyQueryKitFilter("""Age > 18""")
+    .ToListAsync(); // Only returns non-deleted people
+
+// Ignore filters when needed
+var allPeople = await _dbContext.People
+    .IgnoreQueryFilters()
+    .ApplyQueryKitFilter("""Age > 18""")
+    .ToListAsync(); // Returns all people including deleted
+```
+
+## SQL Translation
+
+QueryKit expressions translate efficiently to SQL:
+
+```csharp
+// QueryKit filter
+var input = """FirstName == "Jane" && Age > 18""";
+var people = _dbContext.People.ApplyQueryKitFilter(input);
+
+// Translates to SQL like:
+// SELECT * FROM People 
+// WHERE FirstName = 'Jane' AND Age > 18
+
+// Arithmetic expressions
+var input = "(Price * Quantity) > 1000";
+var orders = _dbContext.Orders.ApplyQueryKitFilter(input);
+
+// Translates to SQL like:
+// SELECT * FROM Orders
+// WHERE (Price * Quantity) > 1000
+```
+
+## Next Steps
+
+- Learn about [Custom Configuration](/examples/custom-configuration) for derived properties and custom operators
+- Review [Complex Queries](/examples/complex-queries) for advanced filtering patterns
+- See [Basic Filtering](/examples/basic-filtering) for fundamental concepts

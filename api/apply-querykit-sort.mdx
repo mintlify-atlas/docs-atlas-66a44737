@@ -1,0 +1,280 @@
+---
+title: 'ApplyQueryKitSort'
+description: 'Apply sorting operations to IQueryable and IEnumerable collections using string-based sort expressions'
+---
+
+The `ApplyQueryKitSort` extension methods parse and apply sort expressions to your collections, supporting multi-level sorting with ascending and descending order.
+
+## IQueryable Extension
+
+Applies a sort expression to an `IQueryable<T>` collection.
+
+### Method Signature
+
+```csharp
+public static IOrderedQueryable<T> ApplyQueryKitSort<T>(
+    this IQueryable<T> queryable, 
+    string sortExpression, 
+    IQueryKitConfiguration? config = null)
+```
+
+### Parameters
+
+<ParamField path="queryable" type="IQueryable<T>" required>
+  The source queryable collection to sort
+</ParamField>
+
+<ParamField path="sortExpression" type="string" required>
+  The sort expression string to parse and apply
+  
+  **Syntax examples:**
+  - Single property ascending: `"LastName asc"`
+  - Single property descending: `"Age desc"`
+  - Multiple properties: `"LastName asc, FirstName asc"`
+  - Nested properties: `"Address.City asc, Age desc"`
+  - Short syntax: `"LastName"` (defaults to ascending)
+</ParamField>
+
+<ParamField path="config" type="IQueryKitConfiguration?" default="null">
+  Optional configuration to customize property mappings and parsing behavior
+</ParamField>
+
+### Returns
+
+**Type:** `IOrderedQueryable<T>`
+
+Returns the sorted queryable collection. If the sort expression is empty or invalid, returns a queryable ordered by a constant (`OrderBy(_ => 0)`).
+
+### Description
+
+This method parses the sort expression and applies it to the queryable collection using `OrderBy`, `OrderByDescending`, `ThenBy`, and `ThenByDescending` as appropriate. The first property uses `OrderBy` or `OrderByDescending`, and subsequent properties use `ThenBy` or `ThenByDescending` to maintain stable multi-level sorting.
+
+### Example - Single Property Sort
+
+```csharp
+using QueryKit;
+
+// Sort by age descending
+var users = dbContext.Users
+    .ApplyQueryKitSort("Age desc")
+    .ToList();
+
+// Sort by name ascending (explicit)
+var users = dbContext.Users
+    .ApplyQueryKitSort("LastName asc")
+    .ToList();
+
+// Sort by name ascending (implicit)
+var users = dbContext.Users
+    .ApplyQueryKitSort("LastName")
+    .ToList();
+```
+
+### Example - Multiple Property Sort
+
+```csharp
+// Sort by department ascending, then salary descending
+var employees = dbContext.Employees
+    .ApplyQueryKitSort("Department asc, Salary desc")
+    .ToList();
+
+// Sort by multiple properties
+var users = dbContext.Users
+    .ApplyQueryKitSort("LastName asc, FirstName asc, Age desc")
+    .ToList();
+```
+
+### Example - Nested Property Sort
+
+```csharp
+// Sort by nested property
+var users = dbContext.Users
+    .ApplyQueryKitSort("Address.City asc, Address.ZipCode asc")
+    .ToList();
+
+// Complex nested sorting
+var orders = dbContext.Orders
+    .ApplyQueryKitSort("Customer.LastName asc, OrderDate desc")
+    .ToList();
+```
+
+### Example - Combined with Filtering
+
+```csharp
+// Apply filter then sort
+var results = dbContext.Users
+    .ApplyQueryKitFilter("IsActive == true")
+    .ApplyQueryKitSort("LastName asc, FirstName asc")
+    .ToList();
+```
+
+### Example - With Custom Configuration
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.PropertyMappings
+        .Add<User>(x => x.FullName, x => x.LastName + ", " + x.FirstName);
+});
+
+// Sort by mapped property
+var users = dbContext.Users
+    .ApplyQueryKitSort("FullName asc", config)
+    .ToList();
+```
+
+---
+
+## IEnumerable Extension
+
+Applies a sort expression to an `IEnumerable<T>` collection.
+
+### Method Signature
+
+```csharp
+public static IOrderedEnumerable<T> ApplyQueryKitSort<T>(
+    this IEnumerable<T> source, 
+    string sortExpression, 
+    IQueryKitConfiguration? config = null)
+```
+
+### Parameters
+
+<ParamField path="source" type="IEnumerable<T>" required>
+  The source enumerable collection to sort
+</ParamField>
+
+<ParamField path="sortExpression" type="string" required>
+  The sort expression string to parse and apply
+</ParamField>
+
+<ParamField path="config" type="IQueryKitConfiguration?" default="null">
+  Optional configuration to customize property mappings and parsing behavior
+</ParamField>
+
+### Returns
+
+**Type:** `IOrderedEnumerable<T>`
+
+Returns the sorted enumerable collection. If the sort expression is empty or invalid, returns an enumerable ordered by a constant.
+
+### Description
+
+This method parses the sort expression, compiles it to delegates, and applies it to the enumerable collection. This is designed for in-memory collections and executes the sort using LINQ to Objects. The expressions are compiled for efficient in-memory execution.
+
+### Example - In-Memory Sorting
+
+```csharp
+using QueryKit;
+
+// Sort an in-memory list
+var userList = GetUsersFromCache();
+
+var sorted = userList
+    .ApplyQueryKitSort("LastName asc, FirstName asc")
+    .ToList();
+```
+
+### Example - Complex In-Memory Sort
+
+```csharp
+var employees = GetEmployeeList();
+
+var sorted = employees
+    .ApplyQueryKitSort("Department asc, Salary desc, HireDate desc")
+    .ToList();
+```
+
+### Example - Combined Operations
+
+```csharp
+// Filter and sort in-memory collection
+var userList = GetUsersFromCache();
+
+var results = userList
+    .ApplyQueryKitFilter("Age > 25")
+    .ApplyQueryKitSort("LastName asc")
+    .ToList();
+```
+
+---
+
+## Sort Expression Syntax
+
+### Basic Syntax
+
+Sort expressions consist of property names followed by an optional direction keyword:
+
+```
+PropertyName [asc|desc]
+```
+
+### Multiple Properties
+
+Separate multiple sort criteria with commas:
+
+```
+Property1 asc, Property2 desc, Property3 asc
+```
+
+### Direction Keywords
+
+- `asc` - Sort in ascending order (A to Z, 0 to 9, oldest to newest)
+- `desc` - Sort in descending order (Z to A, 9 to 0, newest to oldest)
+- If omitted, defaults to ascending
+
+### Nested Properties
+
+Access nested properties using dot notation:
+
+```
+Address.City asc, Address.State asc
+```
+
+### Examples
+
+| Expression | Description |
+|------------|-------------|
+| `"Age"` | Sort by Age ascending |
+| `"Age asc"` | Sort by Age ascending (explicit) |
+| `"Age desc"` | Sort by Age descending |
+| `"LastName asc, FirstName asc"` | Sort by LastName, then FirstName (both ascending) |
+| `"Department asc, Salary desc"` | Sort by Department ascending, then Salary descending |
+| `"Address.City asc"` | Sort by nested City property |
+
+---
+
+## Behavior Notes
+
+### Empty or Invalid Expressions
+
+If the sort expression is empty, null, or cannot be parsed:
+- The method returns an ordered collection using a constant value: `OrderBy(_ => 0)`
+- This ensures a consistent return type (`IOrderedQueryable<T>` or `IOrderedEnumerable<T>`)
+- No actual sorting is applied to the data
+
+### Sort Stability
+
+The method maintains sort stability through proper use of `OrderBy`/`ThenBy`:
+- The first property uses `OrderBy` or `OrderByDescending`
+- Subsequent properties use `ThenBy` or `ThenByDescending`
+- This ensures multi-level sorting works as expected
+
+### Performance Considerations
+
+**For IQueryable:**
+- Sort expressions are translated to SQL ORDER BY clauses
+- Sorting happens at the database level for efficiency
+- Multiple sorts are combined into a single query
+
+**For IEnumerable:**
+- Expressions are compiled to delegates
+- Sorting happens in-memory
+- Best used for collections already loaded into memory
+
+---
+
+## See Also
+
+- [ApplyQueryKit](/api/apply-querykit) - Apply both filtering and sorting
+- [ApplyQueryKitFilter](/api/apply-querykit-filter) - Apply filtering only

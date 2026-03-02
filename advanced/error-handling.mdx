@@ -1,0 +1,199 @@
+---
+title: Error Handling
+description: Exception types and best practices for handling QueryKit errors
+---
+
+QueryKit provides specific exception types for different parsing and configuration errors, making it easy to implement proper error handling in your application.
+
+## Exception Hierarchy
+
+All QueryKit exceptions inherit from the base `QueryKitException` class, allowing you to catch all QueryKit-specific errors with a single catch block.
+
+## Exception Types
+
+### QueryKitException
+
+Base class for all QueryKit exceptions. Catch this to handle any exception thrown by QueryKit.
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter(input).ToList();
+}
+catch (QueryKitException ex)
+{
+    // Handle any QueryKit error
+    return BadRequest(ex.Message);
+}
+```
+
+### ParsingException
+
+Thrown when there is an invalid operator or bad syntax is used (e.g., not using double quotes around a string or guid).
+
+**Common causes:**
+- Invalid comparison operator
+- Invalid logical operator
+- Missing quotes around strings or GUIDs
+- Malformed expressions
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter("Name = John").ToList(); // Missing quotes
+}
+catch (ParsingException ex)
+{
+    // ex.Message includes details about the parsing failure
+    return BadRequest("Invalid filter syntax: " + ex.Message);
+}
+```
+
+### UnknownFilterPropertyException
+
+Thrown if a property is not recognized during filtering.
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter("NonExistentProperty == 'value'").ToList();
+}
+catch (UnknownFilterPropertyException ex)
+{
+    // ex.Message: "The filter property 'NonExistentProperty' was not recognized."
+    return BadRequest(ex.Message);
+}
+```
+
+### SortParsingException
+
+Thrown if a property or operation is not recognized during sorting.
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitSort("InvalidProperty asc").ToList();
+}
+catch (SortParsingException ex)
+{
+    // ex.Message: "Parsing failed during sorting. 'InvalidProperty' was not recognized."
+    return BadRequest(ex.Message);
+}
+```
+
+### QueryKitDbContextTypeException
+
+Thrown when trying to use a `DbContext`-specific workflow without passing that context (e.g., SoundEx operations).
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter("Name ~~ 'Smith'").ToList();
+}
+catch (QueryKitDbContextTypeException ex)
+{
+    // Need to provide DbContext type in configuration
+    return BadRequest("DbContext configuration required: " + ex.Message);
+}
+```
+
+### SoundsLikeNotImplementedException
+
+Thrown when trying to use soundex on a `DbContext` that doesn't have it implemented.
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter("Name ~~ 'Smith'", config).ToList();
+}
+catch (SoundsLikeNotImplementedException ex)
+{
+    // ex.Message: "The DbContext type MyDbContext does not have a SoundsLike method."
+    return BadRequest(ex.Message);
+}
+```
+
+### QueryKitParsingException
+
+A more generic error that includes specific details on a more granular error in the parsing pipeline.
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter(input).ToList();
+}
+catch (QueryKitParsingException ex)
+{
+    return BadRequest("Parsing error: " + ex.Message);
+}
+```
+
+### QueryKitPropertyDepthExceededException
+
+Thrown when a property path exceeds the configured `MaxPropertyDepth` limit.
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter("Level1.Level2.Level3.Level4.Level5 == 'value'").ToList();
+}
+catch (QueryKitPropertyDepthExceededException ex)
+{
+    // ex.Message: "The property path 'Level1.Level2.Level3.Level4.Level5' has a depth of 5, which exceeds the maximum allowed depth of 3."
+    return BadRequest(ex.Message);
+}
+```
+
+## Best Practices
+
+### Return HTTP 400 for Client Errors
+
+QueryKit exceptions typically indicate invalid user input, making them ideal candidates for HTTP 400 Bad Request responses:
+
+```csharp
+[HttpGet]
+public IActionResult GetPeople([FromQuery] string filter)
+{
+    try
+    {
+        var people = _dbContext.People
+            .ApplyQueryKitFilter(filter)
+            .ToList();
+        
+        return Ok(people);
+    }
+    catch (QueryKitException ex)
+    {
+        return BadRequest(new { error = ex.Message });
+    }
+}
+```
+
+### Catch Specific Exceptions When Needed
+
+Handle specific exceptions differently based on your application's needs:
+
+```csharp
+try
+{
+    var result = queryable.ApplyQueryKitFilter(input, config).ToList();
+}
+catch (UnknownFilterPropertyException ex)
+{
+    // Log and provide helpful message about available properties
+    _logger.LogWarning(ex, "Unknown property in filter");
+    return BadRequest("Invalid property. Available properties: Name, Age, Email");
+}
+catch (ParsingException ex)
+{
+    // Log and provide syntax help
+    _logger.LogWarning(ex, "Invalid filter syntax");
+    return BadRequest("Invalid syntax. Example: Name == \"John\" && Age > 25");
+}
+catch (QueryKitException ex)
+{
+    // Catch-all for other QueryKit errors
+    _logger.LogError(ex, "QueryKit error");
+    return BadRequest(ex.Message);
+}
+```

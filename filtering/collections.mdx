@@ -1,0 +1,293 @@
+---
+title: "Filtering Collections"
+description: "Filter entity collections and nested relationships using QueryKit"
+---
+
+QueryKit allows you to filter into collections using most of the standard comparison operators. You can use `Any` or `All` semantics when filtering collections.
+
+## Basic Collection Filtering
+
+By default, QueryKit uses `Any` when filtering collections:
+
+```csharp
+// Find recipes that have an ingredient named "salt"
+// Uses Any() under the hood
+var input = """Ingredients.Name == "salt" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+This translates to SQL similar to:
+```sql
+WHERE EXISTS (SELECT 1 FROM Ingredients WHERE RecipeId = Recipes.Id AND Name = 'salt')
+```
+
+## Using All Semantics
+
+To use `All` instead of `Any`, prefix the operator with `%`:
+
+```csharp
+// Find recipes where ALL ingredients have stock >= 1
+var input = """Ingredients.Stock %>= 1""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+<Note>
+The `%` prefix switches from `Any` (at least one matches) to `All` (every item must match).
+</Note>
+
+## Collection Operators
+
+### Any (Default Behavior)
+
+Without the `%` prefix, collection filters use `Any` logic:
+
+```csharp
+// Any ingredient equals "salt"
+var input = """Ingredients.Name == "salt" """;
+
+// Any order total is greater than 1000
+var input = "Customer.Orders.Total > 1000";
+
+// Any tag contains "featured"
+var input = """Tags @=* "featured" """;
+```
+
+### All (% Prefix)
+
+With the `%` prefix, collection filters use `All` logic:
+
+```csharp
+// All ingredients have stock >= 1
+var input = """Ingredients.Stock %>= 1""";
+
+// All orders are completed
+var input = """Customer.Orders.Status %== "Completed" """;
+
+// All ratings are above 4
+var input = "Reviews.Rating %> 4";
+```
+
+## Primitive Collections
+
+For primitive collection types like `List<string>`, use the `Has` or `DoesNotHave` operators:
+
+```csharp
+// Has operator (case-sensitive)
+var input = """Tags ^$ "winner" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Has operator (case-insensitive)
+var input = """Tags ^$* "winner" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Does not have operator
+var input = """Tags !^$ "draft" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Does not have operator (case-insensitive)
+var input = """Tags !^$* "draft" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+## Count-Based Filtering
+
+Filter collections based on their count by prefixing operators with `#`:
+
+```csharp
+// Recipes with more than 0 ingredients
+var input = """Ingredients #> 0""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Recipes with at least 5 ingredients
+var input = """Ingredients #>= 5""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Recipes with exactly 3 ingredients
+var input = """Ingredients #== 3""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Recipes with less than 10 ingredients
+var input = """Ingredients #< 10""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+### Available Count Operators
+
+| Operator | Description | Example |
+|----------|-------------|----------|
+| `#==`    | Count equals | `Ingredients #== 5` |
+| `#!=`    | Count not equals | `Ingredients #!= 0` |
+| `#>`     | Count greater than | `Ingredients #> 3` |
+| `#<`     | Count less than | `Ingredients #< 10` |
+| `#>=`    | Count greater or equal | `Ingredients #>= 1` |
+| `#<=`    | Count less or equal | `Ingredients #<= 20` |
+
+## Nested Collections
+
+QueryKit supports filtering nested collections using property mappings:
+
+```csharp
+var preparationText = "Chop finely";
+var input = $"""preparations == "{preparationText}" """;
+
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.Property<Recipe>(x => x.Ingredients
+        .SelectMany(y => y.Preparations)
+        .Select(y => y.Text))
+        .HasQueryName("preparations");
+});
+
+var queryableRecipes = _dbContext.Recipes;
+var appliedQueryable = queryableRecipes.ApplyQueryKitFilter(input, config);
+var recipes = await appliedQueryable.ToListAsync();
+```
+
+<Note>
+Nested collection filtering requires configuration to define the path to the nested property.
+</Note>
+
+## Complex Collection Examples
+
+### Multiple Collection Conditions
+
+```csharp
+// Recipes with salt AND at least 5 ingredients
+var input = """Ingredients.Name == "salt" && Ingredients #>= 5""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+### Collection with Property Filters
+
+```csharp
+// Customers with high-value pending orders
+var input = """Orders.Total > 1000 && Orders.Status == "Pending" """;
+var customers = _dbContext.Customers.ApplyQueryKitFilter(input).ToList();
+```
+
+### All vs Any Comparison
+
+```csharp
+// At least one ingredient is in stock (Any)
+var input = """Ingredients.Stock > 0""";
+
+// All ingredients are in stock (All)
+var input = """Ingredients.Stock %> 0""";
+
+// Practical difference:
+// Recipe with ingredients: [Stock=10, Stock=0, Stock=5]
+// Any: Matches (at least one has stock)
+// All: Doesn't match (not all have stock)
+```
+
+### Combining Count and Content Filters
+
+```csharp
+// Recipes with many ingredients, including salt
+var input = """Ingredients #> 10 && Ingredients.Name == "salt" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+## Practical Use Cases
+
+### E-Commerce: Order Filtering
+
+```csharp
+// Customers with pending orders over $500
+var input = """Orders.Status == "Pending" && Orders.Total > 500""";
+var customers = _dbContext.Customers.ApplyQueryKitFilter(input).ToList();
+
+// Customers with all orders completed
+var input = """Orders.Status %== "Completed" """;
+var loyalCustomers = _dbContext.Customers.ApplyQueryKitFilter(input).ToList();
+```
+
+### Content Management: Tag Filtering
+
+```csharp
+// Articles with "featured" tag
+var input = """Tags ^$* "featured" """;
+var articles = _dbContext.Articles.ApplyQueryKitFilter(input).ToList();
+
+// Articles without "draft" tag
+var input = """Tags !^$* "draft" """;
+var publishedArticles = _dbContext.Articles.ApplyQueryKitFilter(input).ToList();
+```
+
+### Recipe Management
+
+```csharp
+// Recipes that can be made (all ingredients in stock)
+var input = """Ingredients.Stock %> 0""";
+var availableRecipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Recipes with specific ingredient
+var input = """Ingredients.Name ==* "chicken" """;
+var chickenRecipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Simple recipes (few ingredients)
+var input = """Ingredients #<= 5""";
+var simpleRecipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+### Project Management: Task Filtering
+
+```csharp
+// Projects with incomplete tasks
+var input = """Tasks.Status != "Completed" """;
+var activeProjects = _dbContext.Projects.ApplyQueryKitFilter(input).ToList();
+
+// Projects where all tasks are completed
+var input = """Tasks.Status %== "Completed" """;
+var completedProjects = _dbContext.Projects.ApplyQueryKitFilter(input).ToList();
+
+// Projects with many tasks
+var input = """Tasks #> 20""";
+var largeProjects = _dbContext.Projects.ApplyQueryKitFilter(input).ToList();
+```
+
+## Important Considerations
+
+### Performance
+
+Collection filtering can impact performance on large datasets:
+
+```csharp
+// This may be slow on large collections
+var input = """Items.SubItems.Details.Value > 100""";
+
+// Consider adding indexes or restructuring data
+```
+
+### Null Collections
+
+Be aware of how null collections are handled:
+
+```csharp
+// If Ingredients collection is null, this won't match
+var input = """Ingredients.Name == "salt" """;
+
+// Consider checking for null first if needed
+var input = """Ingredients != null && Ingredients.Name == "salt" """;
+```
+
+<Warning>
+Filtering deeply nested collections can impact query performance. Consider optimizing your data structure or adding appropriate database indexes for frequently queried collection properties.
+</Warning>
+
+## Supported Operators for Collections
+
+Most comparison operators work with collections:
+
+- `==`, `!=` (Equals, Not Equals)
+- `>`, `<`, `>=`, `<=` (Comparison operators)
+- `@=`, `@=*` (Contains)
+- `_=`, `_=*` (Starts With)
+- `_-=`, `_-=*` (Ends With)
+- `!@=`, `!@=*` (Not Contains)
+- `!_=`, `!_=*` (Not Starts With)  
+- `!_-=`, `!_-=*` (Not Ends With)
+- `^$`, `^$*` (Has - for primitive collections)
+- `!^$`, `!^$*` (Does Not Have - for primitive collections)
+
+All can be prefixed with `%` to use `All` semantics instead of `Any`.

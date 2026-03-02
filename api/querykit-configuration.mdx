@@ -1,0 +1,213 @@
+---
+title: "QueryKitConfiguration"
+description: "Configuration class for customizing QueryKit's parsing behavior and operators"
+---
+
+## Overview
+
+The `QueryKitConfiguration` class implements `IQueryKitConfiguration` and provides runtime configuration for QueryKit's filtering and sorting behavior. It allows you to customize operator syntax, property mappings, and parsing options.
+
+This class is typically instantiated with a `QueryKitSettings` configuration action and provides immutable configuration at runtime.
+
+**Namespace:** `QueryKit.Configuration`
+
+## Constructor
+
+### QueryKitConfiguration(Action\<QueryKitSettings\> configureSettings)
+
+Creates a new configuration instance by applying settings through a configuration action.
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.EqualsOperator = "eq";
+    settings.AllowUnknownProperties = true;
+    settings.MaxPropertyDepth = 3;
+});
+```
+
+## Properties
+
+<ParamField path="PropertyMappings" type="QueryKitPropertyMappings">
+  Gets the property mappings configured for customizing property names and behaviors.
+</ParamField>
+
+### Comparison Operators
+
+<ParamField path="EqualsOperator" type="string">
+  The operator string for equality comparisons (e.g., `==`, `eq`).
+</ParamField>
+
+<ParamField path="NotEqualsOperator" type="string">
+  The operator string for inequality comparisons (e.g., `!=`, `neq`).
+</ParamField>
+
+<ParamField path="GreaterThanOperator" type="string">
+  The operator string for greater than comparisons (e.g., `>`, `gt`).
+</ParamField>
+
+<ParamField path="LessThanOperator" type="string">
+  The operator string for less than comparisons (e.g., `<`, `lt`).
+</ParamField>
+
+<ParamField path="GreaterThanOrEqualOperator" type="string">
+  The operator string for greater than or equal comparisons (e.g., `>=`, `gte`).
+</ParamField>
+
+<ParamField path="LessThanOrEqualOperator" type="string">
+  The operator string for less than or equal comparisons (e.g., `<=`, `lte`).
+</ParamField>
+
+### String Operators
+
+<ParamField path="ContainsOperator" type="string">
+  The operator string for string contains checks (e.g., `@@`, `contains`).
+</ParamField>
+
+<ParamField path="StartsWithOperator" type="string">
+  The operator string for string starts with checks (e.g., `_=`, `startsWith`).
+</ParamField>
+
+<ParamField path="EndsWithOperator" type="string">
+  The operator string for string ends with checks (e.g., `_-`, `endsWith`).
+</ParamField>
+
+<ParamField path="NotContainsOperator" type="string">
+  The operator string for string not contains checks (e.g., `!@@`, `notContains`).
+</ParamField>
+
+<ParamField path="NotStartsWithOperator" type="string">
+  The operator string for string not starts with checks (e.g., `!_=`, `notStartsWith`).
+</ParamField>
+
+<ParamField path="NotEndsWithOperator" type="string">
+  The operator string for string not ends with checks (e.g., `!_-`, `notEndsWith`).
+</ParamField>
+
+### Collection Operators
+
+<ParamField path="InOperator" type="string">
+  The operator string for checking if a value is in a collection (e.g., `^^`, `in`).
+</ParamField>
+
+<ParamField path="NotInOperator" type="string">
+  The operator string for checking if a value is not in a collection (e.g., `!^^`, `notIn`).
+</ParamField>
+
+### Sound-alike Operators
+
+<ParamField path="SoundsLikeOperator" type="string">
+  The operator string for phonetic similarity checks (e.g., `~=`, `soundsLike`).
+</ParamField>
+
+<ParamField path="DoesNotSoundLikeOperator" type="string">
+  The operator string for phonetic dissimilarity checks (e.g., `!~=`, `doesNotSoundLike`).
+</ParamField>
+
+### Collection Count Operators
+
+<ParamField path="HasCountEqualToOperator" type="string">
+  The operator string for checking collection count equality (e.g., `#==`).
+</ParamField>
+
+<ParamField path="HasCountNotEqualToOperator" type="string">
+  The operator string for checking collection count inequality (e.g., `#!=`).
+</ParamField>
+
+<ParamField path="HasCountGreaterThanOperator" type="string">
+  The operator string for checking if collection count is greater than a value (e.g., `#>`).
+</ParamField>
+
+<ParamField path="HasCountLessThanOperator" type="string">
+  The operator string for checking if collection count is less than a value (e.g., `#<`).
+</ParamField>
+
+<ParamField path="HasCountGreaterThanOrEqualOperator" type="string">
+  The operator string for checking if collection count is greater than or equal to a value (e.g., `#>=`).
+</ParamField>
+
+<ParamField path="HasCountLessThanOrEqualOperator" type="string">
+  The operator string for checking if collection count is less than or equal to a value (e.g., `#<=`).
+</ParamField>
+
+<ParamField path="HasOperator" type="string">
+  The operator string for checking if a collection has any elements (e.g., `has`).
+</ParamField>
+
+<ParamField path="DoesNotHaveOperator" type="string">
+  The operator string for checking if a collection does not have any elements (e.g., `!has`).
+</ParamField>
+
+### Logical Operators
+
+<ParamField path="AndOperator" type="string">
+  The operator string for logical AND operations (e.g., `&&`, `and`).
+</ParamField>
+
+<ParamField path="OrOperator" type="string">
+  The operator string for logical OR operations (e.g., `||`, `or`).
+</ParamField>
+
+### Case Sensitivity
+
+<ParamField path="CaseInsensitiveAppendix" type="string">
+  The appendix string to add to operators for case-insensitive comparisons (e.g., `*` for `==*`).
+</ParamField>
+
+<ParamField path="CaseInsensitiveComparison" type="CaseInsensitiveMode">
+  The mode for performing case-insensitive comparisons. Options include converting to lower or upper case.
+</ParamField>
+
+### Parsing Options
+
+<ParamField path="AllowUnknownProperties" type="bool" default="false">
+  When `true`, allows filtering on properties that don't exist on the entity without throwing an exception.
+</ParamField>
+
+<ParamField path="DbContextType" type="Type?" default="null">
+  The DbContext type to use for database-specific operations like phonetic comparisons.
+</ParamField>
+
+<ParamField path="MaxPropertyDepth" type="int?" default="null">
+  The maximum depth for nested property access. Set to limit how deep property chains like `User.Address.City` can go.
+</ParamField>
+
+## Usage Example
+
+```csharp
+using QueryKit.Configuration;
+
+// Create configuration with custom operators
+var config = new QueryKitConfiguration(settings =>
+{
+    // Use SQL-style operators
+    settings.EqualsOperator = "=";
+    settings.NotEqualsOperator = "<>";
+    
+    // Allow filtering on unmapped properties
+    settings.AllowUnknownProperties = true;
+    
+    // Limit nested property depth
+    settings.MaxPropertyDepth = 3;
+    
+    // Configure property mappings
+    settings.Property<User>(u => u.FirstName)
+        .HasQueryName("name");
+});
+
+// Use configuration with QueryKit
+var data = new QueryKitData
+{
+    Filters = "name = 'John'",
+    Configuration = config
+};
+
+var results = dbContext.Users
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+## See Also
+
+- [QueryKitSettings](/api/querykit-settings) - Settings class for configuring QueryKit
+- [QueryKitData](/api/querykit-data) - Data transfer object for filters and sorting

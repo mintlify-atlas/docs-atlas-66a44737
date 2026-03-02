@@ -1,0 +1,68 @@
+---
+title: SoundEx
+description: Configure your DbContext to use the Sounds Like and Does Not Sound Like operators
+---
+
+The `Sounds Like` (`~~`) and `Does Not Sound Like` (`!~`) operators require a soundex configuration on any `DbContext` that contains your `DbSet` being filtered on.
+
+## DbContext Configuration
+
+You need to add a `DbFunction` pointer to your `DbContext`. The `SoundsLike` method does not need to implement anything and is just used as a pointer to the database method.
+
+```csharp
+public class ExampleDbContext : DbContext
+{
+    public ExampleDbContext(DbContextOptions<TestingDbContext> options)
+        : base(options)
+    {
+    }
+    
+    [DbFunction (Name = "SOUNDEX", IsBuiltIn = true)]
+    public static string SoundsLike(string query) => throw new NotImplementedException();
+
+    public DbSet<People> MyPeople { get; set; }
+    
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.HasPostgresExtension("fuzzystrmatch");
+    }
+}
+```
+
+<Note>
+  With Postgres, you need to add `modelBuilder.HasPostgresExtension("fuzzystrmatch");` in `OnModelCreating` along with a migration for adding the extension.
+</Note>
+
+## Using SoundEx with IQueryable
+
+You can use the `SoundsLike` method directly on a normal `IQueryable`:
+
+```csharp
+var waffleRecipes = _dbContext.MyPeople
+  .Where(x => ExampleDbContext.SoundsLike(x.LastName) == ExampleDbContext.SoundsLike("devito"))
+  .ToList();
+```
+
+## Using SoundEx with QueryKit
+
+Once your `DbContext` is configured to allow soundex, you need to provide that `DbContext` type in your QueryKit configuration. This is because there is no reliable way to get the `DbContext` from an `IQueryable`.
+
+```csharp
+var input = $"""LastName ~~ "devito" """;
+
+// Configure QueryKit with your DbContext type
+var queryablePeople = testingServiceScope.DbContext().People;
+var appliedQueryable = queryablePeople.ApplyQueryKitFilter(input, new QueryKitConfiguration(o =>
+{
+    o.DbContextType = typeof(TestingDbContext);
+}));
+var people = await appliedQueryable.ToListAsync();
+```
+
+## Operators
+
+- `~~` - Sounds Like
+- `!~` - Does Not Sound Like
+
+Both operators perform fuzzy string matching based on how words sound rather than exact spelling.

@@ -1,0 +1,266 @@
+---
+title: Basic Filtering
+description: Simple filter examples with common patterns for getting started with QueryKit
+---
+
+## Getting Started with Filters
+
+QueryKit makes it easy to filter your data using a simple, intuitive syntax. Here are the most common filtering patterns you'll use.
+
+## Simple Equality Filters
+
+Filter by exact matches on strings, numbers, booleans, and dates:
+
+```csharp
+// Filter by string
+var input = """FirstName == "Jane" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input)
+    .ToList();
+
+// Filter by number
+var input = "Age > 30";
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input)
+    .ToList();
+
+// Filter by boolean
+var input = """Title == "chicken & waffles" && Favorite == true""";
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input)
+    .ToList();
+
+// Filter by GUID
+var input = """Id == "6d623e92-d2cf-4496-a2df-f49fa77328ee" """;
+var people = _dbContext.People
+    .ApplyQueryKitFilter(input)
+    .ToList();
+```
+
+## String Comparison Operators
+
+QueryKit provides powerful string matching operators:
+
+```csharp
+// Contains (case-insensitive with *)
+var input = """Title @=* "waffle" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Starts with
+var input = """Title _= "lam" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Ends with (case-insensitive)
+var input = """Title _-=* "b" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Not contains
+var input = """Title !@= "test" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Numeric Comparisons
+
+All standard comparison operators are available:
+
+```csharp
+// Greater than
+var input = "Age > 30";
+
+// Greater than or equal
+var input = "Age >= 30";
+
+// Less than
+var input = "Age < 30";
+
+// Less than or equal
+var input = "Age <= 30";
+
+// Not equals
+var input = "Age != 25";
+
+// Decimal comparisons
+var input = "Rating >= 3.5";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Date and Time Filtering
+
+Filter by dates and times using ISO 8601 format:
+
+```csharp
+// DateOnly
+var input = """Date == "2022-07-01" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// DateTimeOffset
+var input = """SpecificDate == "2022-07-01T00:00:03Z" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// DateTime
+var input = """Birthday == "2022-07-01T00:00:03" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// TimeOnly
+var input = """Time == "12:30:00" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// TimeOnly with microseconds
+var input = """Time == "12:30:00.678722" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Logical Operators
+
+Combine multiple conditions using `&&` (and) and `||` (or):
+
+```csharp
+// AND operator
+var input = """FirstName == "Jane" && Age > 10""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// OR operator
+var input = """FirstName == "Jane" || FirstName == "John" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Mixed operators with parentheses
+var input = """(FirstName == "Jane" && Age < 10) || FirstName == "John" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## In Operator
+
+Filter by checking if a value is in a list:
+
+```csharp
+// Numeric values
+var input = "Age ^^ [20, 30, 40]";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// String values (case-insensitive with *)
+var input = """BirthMonth ^^* ["January", "February", "March"]""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// GUIDs
+var input = """Id ^^ ["6d623e92-d2cf-4496-a2df-f49fa77328ee"]""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Not in
+var input = "Age !^^ [20, 30, 40]";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Null Checks
+
+Check for null or non-null values:
+
+```csharp
+// Check if null
+var input = "Title == null";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Check if not null
+var input = "Title != null";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Property List Grouping
+
+Search across multiple properties with a single condition:
+
+```csharp
+// Search for "paul" in either FirstName OR LastName
+var input = """(FirstName, LastName) @=* "paul" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Search across multiple text fields
+var input = """(FirstName, LastName, Email) @=* "john" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Exact match on any of several properties
+var input = """(Status, Type, Category) == "Active" """;
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+## Filtering Collections
+
+Filter into nested collections:
+
+```csharp
+// Filter by collection property (uses Any by default)
+var input = """Ingredients.Name == "salt" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Filter using All (prefix operator with %)
+var input = """Ingredients.Stock %>= 1""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Filter by collection count
+var input = """Ingredients #>= 1""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Has operator for primitive collections
+var input = """Tags ^$ "winner" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Does not have
+var input = """Tags !^$ "loser" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+## Filtering Enums
+
+Filter enums using their integer value:
+
+```csharp
+public enum BirthMonthEnum
+{
+    January = 1,
+    February = 2,
+    March = 3
+}
+
+var input = "BirthMonth == 1"; // Filters for January
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Case Sensitivity
+
+Most string operators support case-insensitive versions by appending `*`:
+
+```csharp
+// Case-sensitive
+var input = """Title @= "Waffle" """; // Must match case exactly
+
+// Case-insensitive
+var input = """Title @=* "waffle" """; // Matches any case
+
+// Works with other operators too
+var input = """Title ==* "chicken" """; // Case-insensitive equals
+var input = """Title _=* "ch" """; // Case-insensitive starts with
+var input = """Title _-=* "en" """; // Case-insensitive ends with
+```
+
+## Common Patterns
+
+Here are some frequently used filter combinations:
+
+```csharp
+// Search and filter
+var input = """(FirstName, LastName) @=* "smith" && Age > 25 && Status == "Active" """;
+
+// Date range
+var input = """Date >= "2022-01-01" && Date <= "2022-12-31" """;
+
+// Multiple OR conditions
+var input = """Status == "Active" || Status == "Pending" || Status == "Draft" """;
+
+// Complex boolean logic
+var input = """(Age >= 18 && Age <= 65) && (Status == "Active" || Status == "Pending")""";
+```
+
+## Next Steps
+
+- Learn about [Complex Queries](/examples/complex-queries) with nested conditions and arithmetic
+- Explore [EF Core Integration](/examples/ef-core-integration) for working with DbContext
+- See [Custom Configuration](/examples/custom-configuration) for property aliases and advanced settings

@@ -1,0 +1,465 @@
+---
+title: Filtering
+description: Learn how to filter data using QueryKit's powerful and intuitive filtering syntax
+---
+
+QueryKit provides a comprehensive filtering system that translates string-based filter expressions into efficient LINQ expressions. This allows you to build dynamic queries with minimal code.
+
+## Basic Usage
+
+To apply filters to your queryable, pass a filter string to the `ApplyQueryKitFilter` extension method:
+
+```csharp
+var people = _dbContext.People
+    .ApplyQueryKitFilter("Age < 10")
+    .ToList();
+```
+
+### With Configuration
+
+You can customize property names and behavior using `QueryKitConfiguration`:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first")
+        .PreventSort();
+});
+
+var people = _dbContext.People
+    .ApplyQueryKitFilter("first == \"Jane\" && Age < 10", config)
+    .ToList();
+```
+
+## Comparison Operators
+
+QueryKit supports a wide variety of comparison operators. Append `*` to most operators for case-insensitive comparisons.
+
+| Name                  | Operator | Case Insensitive | Count Operator |
+| --------------------- | -------- | ---------------- | -------------- |
+| Equals                | `==`     | `==*`            | `#==`          |
+| Not Equals            | `!=`     | `!=*`            | `#!=`          |
+| Greater Than          | `>`      | N/A              | `#>`           |
+| Less Than             | `<`      | N/A              | `#<`           |
+| Greater Than Or Equal | `>=`     | N/A              | `#>=`          |
+| Less Than Or Equal    | `<=`     | N/A              | `#<=`          |
+| Starts With           | `_=`     | `_=*`            | N/A            |
+| Does Not Start With   | `!_=`    | `!_=*`           | N/A            |
+| Ends With             | `_-=`    | `_-=*`           | N/A            |
+| Does Not End With     | `!_-=`   | `!_-=*`          | N/A            |
+| Contains              | `@=`     | `@=*`            | N/A            |
+| Does Not Contain      | `!@=`    | `!@=*`           | N/A            |
+| Sounds Like           | `~~`     | N/A              | N/A            |
+| Does Not Sound Like   | `!~`     | N/A              | N/A            |
+| Has                   | `^$`     | `^$*`            | N/A            |
+| Does Not Have         | `!^$`    | `!^$*`           | N/A            |
+| In                    | `^^`     | `^^*`            | N/A            |
+| Not In                | `!^^`    | `!^^*`           | N/A            |
+
+### Examples
+
+```csharp
+// Equals
+var input = """FirstName == \"Jane\" """;
+
+// Contains (case-insensitive)
+var input = """Email @=* \"gmail\" """;
+
+// In operator
+var input = """Age ^^ [20, 30, 40]""";
+
+// Greater than
+var input = "Age > 18";
+```
+
+## Logical Operators
+
+Combine multiple conditions using logical operators:
+
+- `&&` - AND operator
+- `||` - OR operator
+
+```csharp
+var input = """FirstName == \"Jane\" && Age > 10""";
+var input = """FirstName == \"Jane\" || FirstName == \"John\" """;
+```
+
+### Order of Operations
+
+Use parentheses to control evaluation order:
+
+```csharp
+var input = """(FirstName == \"Jane\" && Age < 10) || FirstName == \"John\" """;
+```
+
+## Property List Grouping
+
+Search across multiple properties with a single comparison:
+
+```csharp
+// Search for "paul" in either FirstName OR LastName
+var input = """(FirstName, LastName) @=* \"paul\" """;
+
+// Equivalent to:
+// FirstName @=* "paul" || LastName @=* "paul"
+```
+
+### Positive vs Negative Operators
+
+**Positive operators** use OR logic (match if found in ANY field):
+```csharp
+// Find records where "john" appears in ANY field
+var input = """(FirstName, LastName, Email) @=* \"john\" """;
+```
+
+**Negative operators** use AND logic (match if NOT found in ALL fields):
+```csharp
+// Find records where "test" is NOT in FirstName AND NOT in LastName
+var input = """(FirstName, LastName) !@=* \"test\" """;
+```
+
+## Advanced Features
+
+### Property-to-Property Comparisons
+
+Compare two properties on the same entity:
+
+```csharp
+// Compare string properties
+var input = """FirstName == LastName""";
+
+// Compare numeric properties
+var input = """Age > Rating""";
+
+// Compare nested properties
+var input = """Author.Name == Title""";
+```
+
+### Arithmetic Expressions
+
+Perform calculations directly in your queries:
+
+```csharp
+// Addition
+var input = "(Age + Rating) > 50";
+
+// Calculate profit margin
+var input = "((Price - Cost) / Price) > 0.2";
+
+// Multiple operations
+var input = """(Price * Quantity) > 1000 && Category == \"Electronics\" """;
+```
+
+<Note>
+Arithmetic expressions support `+`, `-`, `*`, `/`, and `%` operators with standard precedence rules.
+</Note>
+
+### Filtering Collections
+
+Filter on collection properties using `Any` or `All`:
+
+```csharp
+// Default: uses Any
+var input = """Ingredients.Name == \"salt\" """;
+
+// Explicit All: prefix operator with %
+var input = """Ingredients.Stock %>= 1""";
+
+// Count operators
+var input = """Ingredients #>= 0""";
+
+// Primitive collections
+var input = """Tags ^$ \"winner\" """;
+```
+
+### Nested Objects
+
+Access nested properties using dot notation:
+
+```csharp
+var input = """Email.Value == \"hello@gmail.com\" """;
+
+// Or with an alias
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.Email.Value).HasQueryName("email");
+});
+var input = """email == \"hello@gmail.com\" """;
+```
+
+### Filtering Enums
+
+Filter enums using their integer values:
+
+```csharp
+var input = "BirthMonth == 1"; // January
+
+public enum BirthMonthEnum
+{
+    January = 1,
+    February = 2,
+    // ...
+}
+```
+
+## Data Type Support
+
+### Strings and GUIDs
+
+Wrap in double quotes:
+
+```csharp
+var input = """FirstName == \"Jane\" """;
+var input = """Id == \"6d623e92-d2cf-4496-a2df-f49fa77328ee\" """;
+
+// null doesn't need quotes
+var input = "Title == null";
+```
+
+### Dates and Times
+
+Use ISO 8601 format:
+
+```csharp
+// DateOnly
+var input = """Birthday == \"2022-07-01\" """;
+
+// DateTime
+var input = """Birthday == \"2022-07-01T00:00:03\" """;
+
+// DateTimeOffset
+var input = """Birthday == \"2022-07-01T00:00:03Z\" """;
+
+// TimeOnly
+var input = """Time == \"12:30:00\" """;
+```
+
+### Booleans
+
+Must use explicit comparison:
+
+```csharp
+// ✅ Correct
+var input = """Favorite == true""";
+var input = """IsActive != false""";
+
+// ❌ Wrong
+var input = """Favorite""";
+```
+
+## Configuration Options
+
+### Property Settings
+
+Customize how properties are filtered:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Custom property name
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first");
+    
+    // Prevent filtering
+    config.Property<Person>(x => x.Age)
+        .PreventFilter();
+});
+```
+
+### Derived Properties
+
+Create computed properties for filtering:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+        .HasQueryName("fullname");
+    
+    config.DerivedProperty<Person>(p => p.Age >= 18 && p.FirstName == "John")
+        .HasQueryName("adult_johns");
+});
+
+var input = """fullname @=* \"John Doe\" """;
+var input = """adult_johns == true""";
+```
+
+### Custom Operations
+
+Implement complex business logic:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Custom operation with related data
+    config.CustomOperation<Book>((x, op, value) => 
+        x.Orders.Where(y => y.OrderDate > DateTime.UtcNow.AddDays(-10))
+            .Sum(o => o.Quantity) > (int)value)
+        .HasQueryName("SoldUnitsMoreThan10Days");
+    
+    // VIP customer detection
+    config.CustomOperation<Customer>((x, op, value) => 
+        (bool)value ? 
+            (x.TotalPurchases > 10000 && x.AccountAge > 365) :
+            !(x.TotalPurchases > 10000 && x.AccountAge > 365))
+        .HasQueryName("isVipCustomer");
+});
+
+var input = """SoldUnitsMoreThan10Days > 100""";
+var input = """isVipCustomer == true""";
+```
+
+### Custom Operators
+
+Define your own operator syntax:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.EqualsOperator = "eq";
+    config.NotEqualsOperator = "neq";
+    config.ContainsOperator = "ct";
+    config.AndOperator = "and";
+    config.OrOperator = "or";
+    config.CaseInsensitiveAppendix = "i";
+});
+
+var input = """Title eqi \"Pancakes\" and Rating gt 10""";
+```
+
+<Warning>
+Spaces must be used around custom comparison operators:
+- ✅ `Title eq "value"`
+- ❌ `Title eq"value"`
+</Warning>
+
+### Allow Unknown Properties
+
+By default, QueryKit throws an error for unrecognized properties. To ignore them:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.AllowUnknownProperties = true;
+});
+```
+
+### Case-Insensitive Comparison Mode
+
+Control how case-insensitive operators work:
+
+```csharp
+// Global setting
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+});
+
+// Per-property override
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Lower;
+    settings.Property<Person>(x => x.Email)
+        .HasCaseInsensitiveMode(CaseInsensitiveMode.Upper);
+});
+```
+
+<Note>
+Use `CaseInsensitiveMode.Upper` when your data is stored in uppercase or you have uppercase indexes for better performance.
+</Note>
+
+### Max Property Depth
+
+Limit nested property access for security:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.MaxPropertyDepth = 2; // Allow up to 2 levels of nesting
+});
+
+// ✅ Works: "Author.Name" (depth 1)
+// ✅ Works: "Author.Address.City" (depth 2)
+// ❌ Throws: "Author.Address.Country.Name" (depth 3)
+```
+
+### HasConversion Support
+
+For properties using EF Core's `HasConversion`:
+
+```csharp
+// EF configuration
+builder.Property(x => x.Email)
+    .HasConversion(x => x.Value, x => new EmailAddress(x))
+    .HasColumnName("email");
+
+// QueryKit configuration
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.Email)
+        .HasQueryName("email")
+        .HasConversion<string>();
+});
+
+var input = """email == \"hello@gmail.com\" """;
+```
+
+## Error Handling
+
+QueryKit throws specific exceptions for different error scenarios:
+
+```csharp
+try
+{
+    var results = _dbContext.People
+        .ApplyQueryKitFilter(filterInput)
+        .ToList();
+}
+catch (ParsingException ex)
+{
+    // Invalid operator or bad syntax
+    return BadRequest(ex.Message);
+}
+catch (UnknownFilterPropertyException ex)
+{
+    // Property not recognized
+    return BadRequest(ex.Message);
+}
+catch (QueryKitPropertyDepthExceededException ex)
+{
+    // Property path too deep
+    return BadRequest(ex.Message);
+}
+catch (QueryKitException ex)
+{
+    // Base exception - catches all QueryKit errors
+    return BadRequest(ex.Message);
+}
+```
+
+## Complex Example
+
+Here's a comprehensive example combining multiple features:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Recipe>(x => x.Title).HasQueryName("title");
+    config.Property<Recipe>(x => x.Author.Name).HasQueryName("author");
+    config.DerivedProperty<Recipe>(r => r.Ingredients.Count)
+        .HasQueryName("ingredientCount");
+    config.MaxPropertyDepth = 3;
+});
+
+var filterInput = """
+    (title, author) @=* "chocolate" && 
+    (Rating >= 4.5 || ingredientCount < 10) && 
+    (CreatedDate >= "2023-01-01" && CreatedDate <= "2023-12-31") &&
+    Tags ^$ "dessert"
+""";
+
+var recipes = _dbContext.Recipes
+    .ApplyQueryKitFilter(filterInput, config)
+    .ToList();
+```

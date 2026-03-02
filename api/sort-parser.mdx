@@ -1,0 +1,226 @@
+---
+title: SortParser
+description: Parse and generate sort expressions for IQueryable collections using string-based syntax
+---
+
+## Overview
+
+The `SortParser` class provides functionality to parse string-based sort expressions and convert them into strongly-typed LINQ expressions. It supports multi-level sorting with ascending or descending order and null-safe navigation for nested properties.
+
+## Namespace
+
+```csharp
+QueryKit.SortParser
+```
+
+## Methods
+
+### ParseSort
+
+Parses a sort string and generates a list of sort expressions for the specified type.
+
+```csharp
+internal static List<SortExpressionInfo<T>> ParseSort<T>(
+    string input, 
+    IQueryKitConfiguration? config = null
+)
+```
+
+<ParamField path="input" type="string" required>
+  A comma-separated string that defines the sorting criteria. Each clause can specify a property name and optional direction.
+  
+  **Format:** `PropertyName [asc|desc]` or `-PropertyName`
+  
+  **Examples:**
+  - `"Name asc"`
+  - `"Age desc, Name asc"`
+  - `"-CreatedAt, Name"`
+  - `"Address.City asc"`
+</ParamField>
+
+<ParamField path="config" type="IQueryKitConfiguration" default="null">
+  An optional configuration object to provide custom settings for parsing, including:
+  - Property mappings and aliases
+  - Sortable property configuration
+  - Derived property expressions
+  - Maximum property depth validation
+</ParamField>
+
+<ParamField path="T" type="Type Parameter">
+  The type of data to be sorted by the returned expressions.
+</ParamField>
+
+#### Returns
+
+`List<SortExpressionInfo<T>>` - A list of sort expression objects, each containing:
+- `Expression<Func<T, object>>` - The lambda expression for the sort property
+- `bool IsAscending` - Indicates whether the sort is ascending (true) or descending (false)
+
+#### Exceptions
+
+- `SortParsingException` - Thrown when a property name cannot be resolved
+- `ArgumentException` - Thrown when an invalid sort direction is specified
+
+## SortExpressionInfo Class
+
+A helper class that encapsulates sort expression information.
+
+```csharp
+public class SortExpressionInfo<T>
+{
+    public Expression<Func<T, object>>? Expression { get; set; }
+    public bool IsAscending { get; set; }
+}
+```
+
+<ParamField path="Expression" type="Expression<Func<T, object>>">
+  The lambda expression representing the property to sort by. Returns null if the property is not sortable.
+</ParamField>
+
+<ParamField path="IsAscending" type="bool">
+  True for ascending sort, false for descending sort.
+</ParamField>
+
+## Examples
+
+### Basic Sorting
+
+```csharp
+using QueryKit;
+
+// Single property ascending (default)
+var sort = SortParser.ParseSort<Person>("Age");
+// or explicitly
+var sortAsc = SortParser.ParseSort<Person>("Age asc");
+
+// Single property descending
+var sortDesc = SortParser.ParseSort<Person>("Age desc");
+// or using minus prefix
+var sortDescAlt = SortParser.ParseSort<Person>("-Age");
+```
+
+### Multi-Level Sorting
+
+```csharp
+// Sort by multiple properties
+var multiSort = SortParser.ParseSort<Person>(
+    "LastName asc, FirstName asc, Age desc"
+);
+
+// Apply to query
+var query = dbContext.People.AsQueryable();
+var sortedQuery = query.ApplyQueryKitSort("LastName, FirstName, -Age");
+```
+
+### Nested Property Sorting
+
+```csharp
+// Sort by nested property
+var nestedSort = SortParser.ParseSort<Order>(
+    "Customer.LastName asc, Customer.FirstName asc"
+);
+
+// Multiple levels deep
+var deepSort = SortParser.ParseSort<Order>(
+    "Customer.Address.City asc, OrderDate desc"
+);
+```
+
+### Using Configuration
+
+```csharp
+var config = new QueryKitConfiguration(options =>
+{
+    // Add property alias
+    options.Property(x => x.FirstName)
+        .HasQueryName("fname")
+        .CanSort();
+    
+    // Prevent sorting on specific property
+    options.Property(x => x.SensitiveData)
+        .CanSort(false);
+});
+
+var sort = SortParser.ParseSort<Person>(
+    "fname asc", 
+    config
+);
+```
+
+### Derived Properties
+
+```csharp
+var config = new QueryKitConfiguration(options =>
+{
+    // Define a derived property for sorting
+    options.Property(x => x.FullName)
+        .HasQueryName("fullname")
+        .HasExpression(x => x.FirstName + " " + x.LastName);
+});
+
+var sort = SortParser.ParseSort<Person>(
+    "fullname asc", 
+    config
+);
+```
+
+### Null-Safe Sorting
+
+```csharp
+// The parser automatically handles null references in nested properties
+var nullSafeSort = SortParser.ParseSort<Order>(
+    "Customer.Address.City asc"
+);
+// Null customers or null addresses will be handled gracefully
+```
+
+## Sort Directions
+
+### Ascending
+
+- `asc` - Explicit ascending order
+- No direction specified - Defaults to ascending
+
+**Example:**
+```csharp
+"Name asc"  // Explicit
+"Name"      // Implicit (same as above)
+```
+
+### Descending
+
+- `desc` - Explicit descending order  
+- `-` prefix - Alternative descending syntax
+
+**Example:**
+```csharp
+"Age desc"  // Explicit
+"-Age"      // Alternative (same as above)
+```
+
+## Integration with QueryKit Extensions
+
+While `ParseSort` is an internal method, you typically use it through the QueryKit extension methods:
+
+```csharp
+// Extension method usage (recommended)
+var query = dbContext.People
+    .ApplyQueryKitSort("LastName asc, FirstName asc");
+
+// Combined filter and sort
+var query = dbContext.People
+    .ApplyQueryKit(
+        filter: "Age > 25",
+        sort: "LastName, FirstName"
+    );
+```
+
+## Notes
+
+- Property names are case-insensitive by default
+- Multiple sort clauses are separated by commas
+- The order of sort clauses matters - earlier clauses have priority
+- Empty or whitespace-only input returns an empty list
+- Properties marked as non-sortable in configuration will be skipped
+- Null values in nested properties are handled automatically with conditional expressions
+- The parser supports both space-separated format (`Name desc`) and prefix format (`-Name`)

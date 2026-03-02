@@ -1,0 +1,216 @@
+---
+title: "Property-to-Property Comparisons"
+description: "Compare entity properties directly to other properties in the same entity"
+---
+
+QueryKit supports comparing one property directly to another property on the same entity. This allows for dynamic filtering where the comparison value is another field rather than a literal value.
+
+## Basic Syntax
+
+Instead of comparing a property to a constant value, you can compare it to another property:
+
+```csharp
+// Compare two string properties
+var input = """FirstName == LastName""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Compare numeric properties
+var input = """Age > Rating""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Supported Operators
+
+Property-to-property comparisons work with all comparison operators:
+
+```csharp
+// Equality
+var input = """FirstName == LastName""";
+
+// Inequality
+var input = """MinValue != MaxValue""";
+
+// Greater than
+var input = """CurrentPrice > OriginalPrice""";
+
+// Less than
+var input = """Age < RetirementAge""";
+
+// Greater than or equal
+var input = """Stock >= MinimumStock""";
+
+// Less than or equal
+var input = """Score1 <= Score2""";
+```
+
+## Type Conversion
+
+QueryKit automatically handles type conversions between compatible numeric types:
+
+```csharp
+// Comparing int with decimal
+var input = """Age > Rating"""; // Age is int, Rating is decimal
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Comparing different numeric types
+var input = """LongValue > IntValue""";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+<Note>
+Automatic type conversion works for compatible numeric types like `int`, `decimal`, `double`, `float`, `long`, etc.
+</Note>
+
+## Complex Expressions
+
+Combine property-to-property comparisons with other filters:
+
+```csharp
+// Use in complex expressions
+var input = """(FirstName != LastName && Age > Rating) || (Score1 <= Score2)""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Combine with regular filters
+var input = """FirstName == LastName && Age > 21""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiple property comparisons
+var input = """MinValue <= CurrentValue && CurrentValue <= MaxValue""";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+## Child Property Comparisons
+
+You can compare child properties to root properties or other child properties:
+
+### Child to Root Property
+
+```csharp
+// Compare child property to root property
+var input = """Author.Name == Title""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Compare nested values to root values
+var input = """Rating > Author.Score""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+### Child to Child Property
+
+```csharp
+// Compare nested child properties
+var input = """Email.Value == CollectionEmail.Value""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Compare different levels of nesting
+var input = """Author.Age > Editor.Age""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+### Complex Child Property Expressions
+
+```csharp
+// Mix child and root properties in complex expressions
+var input = """Author.Name != Title && Rating > Author.Score""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Multiple nested comparisons
+var input = """
+    Author.FirstName == Author.LastName || 
+    (Author.Age > MinimumAge && Editor.Age > MinimumAge)
+""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+## Practical Use Cases
+
+### Data Quality Validation
+
+```csharp
+// Find records where values don't match expected relationships
+var input = """MinPrice > MaxPrice"""; // Data inconsistency
+var invalidProducts = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Find duplicate values
+var input = """FirstName == LastName""";
+var potentialDuplicates = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Business Logic Validation
+
+```csharp
+// Ensure quantities are within limits
+var input = """OrderQuantity <= AvailableStock""";
+var validOrders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+
+// Check price relationships
+var input = """SalePrice < OriginalPrice && SalePrice > CostPrice""";
+var profitableDeals = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+```
+
+### Range Validations
+
+```csharp
+// Values within acceptable ranges
+var input = """MinValue <= Value && Value <= MaxValue""";
+var validRecords = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+
+// Temperature ranges
+var input = """LowTemp < CurrentTemp && CurrentTemp < HighTemp""";
+var normalReadings = _dbContext.Sensors.ApplyQueryKitFilter(input).ToList();
+```
+
+### Comparison with Nested Data
+
+```csharp
+// Compare user data with profile data
+var input = """User.Age > Profile.MinimumAge && User.Level >= Profile.RequiredLevel""";
+var qualifiedUsers = _dbContext.Users.ApplyQueryKitFilter(input).ToList();
+
+// Compare order values
+var input = """Order.Total > Customer.CreditLimit""";
+var ordersNeedingApproval = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+## Features
+
+- **All Operators**: Works with `==`, `!=`, `>`, `<`, `>=`, `<=`
+- **Nested Objects**: Supports comparisons with nested properties like `Author.Name`
+- **Type Conversion**: Automatic conversion between compatible numeric types
+- **Complex Expressions**: Can be combined with logical operators and parentheses
+- **Child Properties**: Compare properties at different nesting levels
+
+<Note>
+Property-to-property comparisons are translated to efficient SQL comparisons, making them performant even on large datasets.
+</Note>
+
+## Important Considerations
+
+### Type Compatibility
+
+Both properties must have compatible types:
+
+```csharp
+// ✅ Compatible types (both numeric)
+var input = """Age > Rating""";
+
+// ✅ Compatible types (both strings)
+var input = """FirstName == LastName""";
+
+// ❌ Incompatible types (string vs number)
+// var input = """FirstName == Age"""; // Will cause an error
+```
+
+### Null Handling
+
+Be mindful of null values when comparing properties:
+
+```csharp
+// Consider null values in your comparisons
+var input = """OptionalField1 == OptionalField2""";
+// This will match when both are null or both have the same value
+```
+
+<Warning>
+Ensure both properties being compared have compatible types. Comparing incompatible types (e.g., string to number) will result in a parsing or execution error.
+</Warning>

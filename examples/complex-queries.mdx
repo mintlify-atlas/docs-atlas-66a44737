@@ -1,0 +1,311 @@
+---
+title: Complex Queries
+description: Advanced filtering with nested conditions, arithmetic expressions, and property comparisons
+---
+
+## Overview
+
+QueryKit supports sophisticated filtering scenarios including arithmetic expressions, property-to-property comparisons, nested object access, and complex logical expressions.
+
+## Arithmetic Expressions
+
+Perform calculations directly within your queries:
+
+### Basic Arithmetic Operations
+
+```csharp
+// Addition
+var input = "(Age + Rating) > 50";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Subtraction
+var input = "(Age - Rating) > 0";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiplication
+var input = "(Price * Quantity) > 1000";
+var orders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+
+// Division
+var input = "(Total / Count) < 100";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+
+// Modulo (find even numbers)
+var input = "(Age % 2) == 0";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Arithmetic with Operator Precedence
+
+Arithmetic follows standard mathematical precedence:
+
+```csharp
+// Multiplication happens before addition
+var input = "(Price + Tax * Rate) > 100";
+var products = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Use parentheses to override precedence
+var input = "((Price + Tax) * Rate) > 100";
+var products = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Complex precedence
+var input = "(Revenue - Cost * 0.3 + Bonus) > 1000";
+var results = _dbContext.Results.ApplyQueryKitFilter(input).ToList();
+```
+
+### Mixing Properties and Literals
+
+```csharp
+// Property with literal
+var input = "(Age - 18) >= 0"; // Age minus 18
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiple properties with literals
+var input = "(Price * 1.1 + ShippingCost) <= Budget";
+var orders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+
+// Calculate profit margin
+var input = "((Price - Cost) / Price) > 0.2";
+var profitableItems = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+```
+
+### Complex Arithmetic Examples
+
+```csharp
+// Calculate efficiency ratio
+var input = "(CompletedTasks / TotalTasks) > 0.8";
+var employees = _dbContext.Employees.ApplyQueryKitFilter(input).ToList();
+
+// Nested arithmetic with logical operators
+var input = """(Revenue - Expenses) > 300 && Category == "Electronics" """;
+var products = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Multiple arithmetic comparisons
+var input = "(Score1 + Score2) > 150 && (Score1 - Score2) < 20";
+var results = _dbContext.Results.ApplyQueryKitFilter(input).ToList();
+
+// Complex business logic
+var input = """
+    (TotalPurchases / NumberOfOrders) > 500 && 
+    Status == "Active"
+""";
+var customers = _dbContext.Customers.ApplyQueryKitFilter(input).ToList();
+```
+
+## Property-to-Property Comparisons
+
+Compare one property directly to another:
+
+### Basic Property Comparisons
+
+```csharp
+// Compare two string properties
+var input = "FirstName == LastName";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Compare numeric properties
+var input = "Age > Rating";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Combined with regular filters
+var input = """FirstName == LastName && Age > 21""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Child Property Comparisons
+
+```csharp
+// Compare child property to root property
+var input = "Author.Name == Title";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+
+// Compare nested child properties
+var input = "Email.Value == CollectionEmail.Value";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+
+// Mix child and root properties
+var input = "Author.Name != Title && Rating > Author.Score";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+## Nested Objects
+
+Access properties in nested objects:
+
+```csharp
+public class Person
+{
+    public Guid Id { get; set; }
+    public EmailAddress Email { get; set; }
+    public Address PhysicalAddress { get; set; }
+}
+
+public class EmailAddress
+{
+    public string Value { get; private set; }
+}
+
+public class Address
+{
+    public string Street { get; set; }
+    public string City { get; set; }
+    public string State { get; set; }
+}
+
+// Access nested properties directly
+var input = """Email.Value == "hello@gmail.com" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiple levels of nesting
+var input = """PhysicalAddress.State == "CA" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Combine nested properties
+var input = """Email.Value @=* "gmail" && PhysicalAddress.State == "CA" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Nested Collections
+
+Filter through multiple levels of collections:
+
+```csharp
+// Filter nested collections
+var input = """Ingredients.Preparations.Text == "dice" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Combine nested collection filters
+var input = """
+    Ingredients.Name == "flour" && 
+    Ingredients.Preparations.Text @=* "mix"
+""";
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+
+// Filter by GUID in nested collection
+var input = """Ingredients.Id == "6d623e92-d2cf-4496-a2df-f49fa77328ee" """;
+var recipes = _dbContext.Recipes.ApplyQueryKitFilter(input).ToList();
+```
+
+## Complex Logical Expressions
+
+Combine multiple conditions with sophisticated logic:
+
+```csharp
+// Order of operations with parentheses
+var input = """
+    (Title @=* "waffle" || Age > 30) || 
+    (Age < 18 && BirthMonth == 1)
+""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multi-level nested conditions
+var input = """
+    ((Title == "lamb" && Age > 30) || Id == "aa648248-cb69-4217-ac95-d7484795afb2") && 
+    (Age < 18 || (BirthMonth == 1 && Title _= "ally"))
+""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Complex with multiple data types
+var input = """
+    (Title @=* "waffle & chicken" && Age > 30) || 
+    Rating > 3.5 || 
+    SpecificDate == "2022-07-01T00:00:03Z" && 
+    (Date == "2022-07-01" || Time == "00:00:03")
+""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Combining Features
+
+Put it all together for powerful queries:
+
+```csharp
+// Arithmetic + Property Comparison + Nested Objects
+var input = """
+    (Age - Author.Age) > 10 && 
+    Author.Address.State == "CA" && 
+    (Price * Quantity) > 1000
+""";
+
+// Collection Filtering + Arithmetic + Logical Operators
+var input = """
+    Ingredients #>= 3 && 
+    (Price - Cost) / Price > 0.3 && 
+    (Status == "Active" || Status == "Pending")
+""";
+
+// Property List Grouping + Nested Collections + Dates
+var input = """
+    (Title, Description) @=* "pasta" && 
+    Ingredients.Name ^$ "tomato" && 
+    CreatedDate >= "2023-01-01"
+""";
+
+// Everything together
+var input = """
+    ((Revenue - Cost * 1.2) > 1000 || TotalSales > 5000) &&
+    (Author.Name, Author.Email) @=* "john" &&
+    Items.Quantity #>= 10 &&
+    CreatedDate >= "2023-01-01" &&
+    (Status == "Active" || Priority > 5)
+""";
+```
+
+## Escaped Quotes
+
+Handle quotes within string values using raw string literal syntax:
+
+```csharp
+// Simple escaped quotes
+var input = """""
+Title == """lamb is great on a "gee-ro" not a "gy-ro" sandwich"""
+""""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Alternative with more quotes
+var input = """""""""
+Title == """"lamb is great on a "gee-ro" not a "gy-ro" sandwich""""
+"""""""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Performance Considerations
+
+### SARGable Queries
+
+QueryKit generates expressions that Entity Framework can translate to efficient SQL:
+
+```csharp
+// This generates efficient SQL with proper indexes
+var input = """LastName == "Smith" && Age > 25""";
+
+// Arithmetic expressions are translated to SQL
+var input = "(Price * Quantity) > 1000";
+// SQL: WHERE (Price * Quantity) > 1000
+
+// Property comparisons translate efficiently
+var input = "StartDate < EndDate";
+// SQL: WHERE StartDate < EndDate
+```
+
+### Index Optimization
+
+For best performance with case-insensitive queries:
+
+```csharp
+// If your data is uppercase, configure to use UPPER()
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+});
+
+// Now case-insensitive queries use UPPER() instead of LOWER()
+var input = """Email ==* "JOHN@EXAMPLE.COM" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input, config).ToList();
+```
+
+## Next Steps
+
+- See [EF Core Integration](/examples/ef-core-integration) for projections and DbContext usage
+- Learn about [Custom Configuration](/examples/custom-configuration) for derived properties and custom operators
+- Review [Basic Filtering](/examples/basic-filtering) for fundamental concepts

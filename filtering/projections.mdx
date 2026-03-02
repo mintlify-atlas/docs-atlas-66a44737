@@ -1,0 +1,419 @@
+---
+title: "Filtering Projections"
+description: "Apply QueryKit filters to projected queryables and raw SQL queries"
+---
+
+QueryKit can filter queryable projections, including standard projections with `Select()` and raw SQL queries via EF Core's `SqlQueryRaw`. This is useful when you need to filter on computed properties, joined data, or complex SQL queries.
+
+## Standard Projections
+
+You can filter on projected DTOs with computed or joined properties:
+
+```csharp
+public class RecipeDto
+{
+    public Guid Id { get; set; }
+    public string Title { get; set; }
+    public string AuthorName { get; set; }
+    public string AuthorInfo { get; set; }  // Computed property
+}
+
+var input = $"""info @=* "{authorName}" """;
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<RecipeDto>(x => x.AuthorInfo).HasQueryName("info");
+});
+
+var queryableRecipe = _dbContext.Recipes
+    .Include(x => x.Author)
+    .Select(x => new RecipeDto
+    {
+        Id = x.Id,
+        Title = x.Title,
+        AuthorName = x.Author.Name,
+        AuthorInfo = x.Author.Name + " - " + x.Author.InternalIdentifier
+    });
+
+var appliedQueryable = queryableRecipe.ApplyQueryKitFilter(input, config);
+var recipes = await appliedQueryable.ToListAsync();
+```
+
+<Note>
+You can use projections without raw SQL. QueryKit works seamlessly with standard LINQ `Select()` projections.
+</Note>
+
+## Key Features
+
+- **Computed Properties**: Filter on concatenated or calculated fields
+- **Joined Data**: Filter on properties from related entities
+- **Property Mapping**: Use friendly query names for DTO properties
+- **Type Safety**: Full C# type safety with DTOs
+- **EF Translation**: Efficient SQL generation
+
+## Filtering Raw SQL Projections
+
+QueryKit works with EF Core's raw SQL queries, allowing you to filter complex SQL results:
+
+```csharp
+public class StudentEnrollmentDto
+{
+    public Guid Id { get; set; }
+    public string StudentFirstName { get; set; }
+    public string StudentLastName { get; set; }
+    public string StudentFullName { get; set; }  // Computed in SQL
+    public int StudentAge { get; set; }
+    public Guid CourseId { get; set; }
+    public string CourseName { get; set; }
+    public DateTime EnrolledOn { get; set; }
+    public DateTime? CourseStartDate { get; set; }
+}
+
+var sql =
+$"""
+SELECT
+    e.id as "Id",
+    COALESCE(s.first_name, '') as "StudentFirstName",
+    COALESCE(s.last_name, '') as "StudentLastName",
+    COALESCE(s.first_name, '') || ' ' || COALESCE(s.last_name, '') as "StudentFullName",
+    s.age as "StudentAge",
+    e.course_id as "CourseId",
+    c.name as "CourseName",
+    e.enrolled_on as "EnrolledOn",
+    c.start_date as "CourseStartDate"
+FROM enrollments e
+LEFT JOIN students s ON e.student_id = s.id
+LEFT JOIN courses c ON e.course_id = c.id
+WHERE e.is_deleted = false
+""";
+
+var projection = dbContext.Database.SqlQueryRaw<StudentEnrollmentDto>(sql);
+
+var queryKitConfig = new QueryKitConfiguration(config =>
+{
+    config.Property<StudentEnrollmentDto>(x => x.StudentFirstName).HasQueryName("studentFirstName");
+    config.Property<StudentEnrollmentDto>(x => x.StudentLastName).HasQueryName("studentLastName");
+    config.Property<StudentEnrollmentDto>(x => x.StudentFullName).HasQueryName("studentName");
+    config.Property<StudentEnrollmentDto>(x => x.StudentAge).HasQueryName("studentAge");
+    config.Property<StudentEnrollmentDto>(x => x.CourseId).HasQueryName("courseId");
+    config.Property<StudentEnrollmentDto>(x => x.CourseName).HasQueryName("courseName");
+    config.Property<StudentEnrollmentDto>(x => x.EnrolledOn).HasQueryName("enrolledOn");
+    config.Property<StudentEnrollmentDto>(x => x.CourseStartDate).HasQueryName("courseStartDate");
+});
+
+var queryKitData = new QueryKitData
+{
+    Filters = request.QueryParameters.Filters,
+    SortOrder = request.QueryParameters.SortOrder,
+    Configuration = queryKitConfig
+};
+
+var appliedCollection = projection.ApplyQueryKit(queryKitData);
+var results = await appliedCollection.ToListAsync();
+```
+
+## Use Cases
+
+### Computed Columns
+
+Filter on SQL-computed values:
+
+```csharp
+public class OrderSummaryDto
+{
+    public Guid OrderId { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal Total { get; set; }  // Computed: SubTotal + TaxAmount
+    public decimal DiscountPercent { get; set; }  // Computed: (Discount / SubTotal) * 100
+}
+
+var sql = """
+    SELECT 
+        order_id as "OrderId",
+        sub_total as "SubTotal",
+        tax_amount as "TaxAmount",
+        sub_total + tax_amount as "Total",
+        (discount / sub_total) * 100 as "DiscountPercent"
+    FROM orders
+""";
+
+var projection = dbContext.Database.SqlQueryRaw<OrderSummaryDto>(sql);
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<OrderSummaryDto>(x => x.Total).HasQueryName("total");
+    config.Property<OrderSummaryDto>(x => x.DiscountPercent).HasQueryName("discountPercent");
+});
+
+// Filter on computed columns
+var input = "total > 1000 && discountPercent >= 10";
+var filtered = projection.ApplyQueryKitFilter(input, config).ToList();
+```
+
+### Complex Joins
+
+Filter results from complex joins and aggregations:
+
+```csharp
+public class CustomerStatsDto
+{
+    public Guid CustomerId { get; set; }
+    public string CustomerName { get; set; }
+    public int OrderCount { get; set; }
+    public decimal TotalSpent { get; set; }
+    public decimal AverageOrderValue { get; set; }
+    public DateTime? LastOrderDate { get; set; }
+}
+
+var sql = """
+    SELECT 
+        c.id as "CustomerId",
+        c.name as "CustomerName",
+        COUNT(o.id) as "OrderCount",
+        SUM(o.total) as "TotalSpent",
+        AVG(o.total) as "AverageOrderValue",
+        MAX(o.order_date) as "LastOrderDate"
+    FROM customers c
+    LEFT JOIN orders o ON c.id = o.customer_id
+    GROUP BY c.id, c.name
+""";
+
+var projection = dbContext.Database.SqlQueryRaw<CustomerStatsDto>(sql);
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<CustomerStatsDto>(x => x.OrderCount).HasQueryName("orderCount");
+    config.Property<CustomerStatsDto>(x => x.TotalSpent).HasQueryName("totalSpent");
+    config.Property<CustomerStatsDto>(x => x.AverageOrderValue).HasQueryName("avgOrderValue");
+});
+
+// Filter on aggregated data
+var input = "orderCount > 10 && totalSpent > 5000 && avgOrderValue > 100";
+var vipCustomers = projection.ApplyQueryKitFilter(input, config).ToList();
+```
+
+### Database-Specific Functions
+
+Leverage database-specific functions in raw SQL:
+
+```csharp
+public class ProductSearchDto
+{
+    public Guid Id { get; set; }
+    public string Name { get; set; }
+    public string Description { get; set; }
+    public decimal SearchScore { get; set; }  // Full-text search score
+}
+
+var sql = """
+    SELECT 
+        p.id as "Id",
+        p.name as "Name",
+        p.description as "Description",
+        ts_rank(search_vector, plainto_tsquery('english', @searchTerm)) as "SearchScore"
+    FROM products p
+""";
+
+var projection = dbContext.Database.SqlQueryRaw<ProductSearchDto>(sql, 
+    new SqlParameter("searchTerm", searchTerm));
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<ProductSearchDto>(x => x.SearchScore).HasQueryName("score");
+});
+
+// Filter by search relevance
+var input = "score > 0.5";
+var relevantProducts = projection.ApplyQueryKitFilter(input, config).ToList();
+```
+
+## Configuration Best Practices
+
+### Map All Filterable Properties
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Map every property you want to filter on
+    config.Property<MyDto>(x => x.Property1).HasQueryName("prop1");
+    config.Property<MyDto>(x => x.Property2).HasQueryName("prop2");
+    config.Property<MyDto>(x => x.Property3).HasQueryName("prop3");
+});
+```
+
+### Use Consistent Naming
+
+```csharp
+// ✅ Good - consistent camelCase names
+config.Property<StudentDto>(x => x.StudentFirstName).HasQueryName("studentFirstName");
+config.Property<StudentDto>(x => x.StudentLastName).HasQueryName("studentLastName");
+config.Property<StudentDto>(x => x.StudentAge).HasQueryName("studentAge");
+
+// ❌ Avoid - inconsistent naming
+config.Property<StudentDto>(x => x.StudentFirstName).HasQueryName("FirstName");
+config.Property<StudentDto>(x => x.StudentLastName).HasQueryName("lastname");
+config.Property<StudentDto>(x => x.StudentAge).HasQueryName("AGE");
+```
+
+### Document Computed Properties
+
+```csharp
+public class OrderDto
+{
+    public Guid Id { get; set; }
+    public decimal SubTotal { get; set; }
+    
+    /// <summary>
+    /// Computed: SubTotal + TaxAmount
+    /// </summary>
+    public decimal Total { get; set; }
+    
+    /// <summary>
+    /// Computed: (Discount / SubTotal) * 100
+    /// </summary>
+    public decimal DiscountPercent { get; set; }
+}
+```
+
+## Combining Filters and Sorting
+
+Use `ApplyQueryKit` to apply both filters and sorting:
+
+```csharp
+var queryKitData = new QueryKitData
+{
+    Filters = "studentAge > 18 && courseName @=* 'computer'",
+    SortOrder = "studentAge desc, studentLastName asc",
+    Configuration = queryKitConfig
+};
+
+var results = projection.ApplyQueryKit(queryKitData).ToListAsync();
+```
+
+## Performance Considerations
+
+### Raw SQL Performance
+
+- Raw SQL queries can be more performant for complex operations
+- Computed columns in SQL are evaluated once
+- Use indexes on the underlying tables
+
+### Projection Performance
+
+```csharp
+// ✅ Good - select only needed properties
+var projection = _dbContext.Books
+    .Select(x => new BookDto
+    {
+        Id = x.Id,
+        Title = x.Title,
+        AuthorName = x.Author.Name
+    });
+
+// ❌ Avoid - selecting entire entities then projecting
+var projection = _dbContext.Books
+    .ToList()  // Materializes everything
+    .Select(x => new BookDto { ... });
+```
+
+<Note>
+Projections reduce the amount of data transferred from the database. Combine them with QueryKit filtering for optimal performance.
+</Note>
+
+## Limitations and Considerations
+
+### Column Aliases Must Match
+
+SQL column aliases must exactly match DTO property names:
+
+```csharp
+// ✅ Correct - aliases match properties
+SELECT s.name as "StudentName"
+public string StudentName { get; set; }
+
+// ❌ Wrong - mismatched names
+SELECT s.name as "student_name"
+public string StudentName { get; set; }
+```
+
+### Filtering Happens in Database
+
+QueryKit filters are translated to SQL `WHERE` clauses:
+
+```csharp
+// This filter:
+var input = "studentAge > 18";
+
+// Adds to the query:
+// WHERE studentAge > 18
+```
+
+<Warning>
+When using raw SQL projections, ensure your SQL column aliases exactly match your DTO property names. Mismatches will cause runtime errors.
+</Warning>
+
+## Advanced Example: Reporting
+
+```csharp
+public class SalesReportDto
+{
+    public string Region { get; set; }
+    public int Year { get; set; }
+    public int Quarter { get; set; }
+    public decimal Revenue { get; set; }
+    public decimal Expenses { get; set; }
+    public decimal Profit { get; set; }
+    public decimal ProfitMargin { get; set; }
+    public int OrderCount { get; set; }
+    public decimal AverageOrderValue { get; set; }
+}
+
+var sql = """
+    SELECT 
+        r.name as "Region",
+        EXTRACT(YEAR FROM o.order_date) as "Year",
+        EXTRACT(QUARTER FROM o.order_date) as "Quarter",
+        SUM(o.total) as "Revenue",
+        SUM(o.cost) as "Expenses",
+        SUM(o.total - o.cost) as "Profit",
+        (SUM(o.total - o.cost) / SUM(o.total)) * 100 as "ProfitMargin",
+        COUNT(o.id) as "OrderCount",
+        AVG(o.total) as "AverageOrderValue"
+    FROM orders o
+    JOIN regions r ON o.region_id = r.id
+    GROUP BY r.name, EXTRACT(YEAR FROM o.order_date), EXTRACT(QUARTER FROM o.order_date)
+""";
+
+var projection = dbContext.Database.SqlQueryRaw<SalesReportDto>(sql);
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<SalesReportDto>(x => x.Region).HasQueryName("region");
+    config.Property<SalesReportDto>(x => x.Year).HasQueryName("year");
+    config.Property<SalesReportDto>(x => x.Quarter).HasQueryName("quarter");
+    config.Property<SalesReportDto>(x => x.Revenue).HasQueryName("revenue");
+    config.Property<SalesReportDto>(x => x.Profit).HasQueryName("profit");
+    config.Property<SalesReportDto>(x => x.ProfitMargin).HasQueryName("margin");
+});
+
+// Complex filtering on report data
+var input = """
+    year == 2024 && 
+    quarter ^^ [1, 2] && 
+    profit > 100000 && 
+    margin > 15 && 
+    (region == "North America" || region == "Europe")
+""";
+
+var data = new QueryKitData
+{
+    Filters = input,
+    SortOrder = "profit desc, margin desc",
+    Configuration = config
+};
+
+var report = await projection.ApplyQueryKit(data).ToListAsync();
+```
+
+This approach combines the power of raw SQL for complex aggregations with QueryKit's flexible filtering capabilities.

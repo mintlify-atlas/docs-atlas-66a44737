@@ -1,0 +1,150 @@
+---
+title: "Comparison Operators"
+description: "Learn about all available comparison operators for filtering in QueryKit"
+---
+
+QueryKit provides a wide variety of comparison operators that use the same base syntax as [Sieve](https://github.com/Biarity/Sieve)'s operators. All operators support case-insensitive operations by appending a `*` at the end.
+
+## Operator Reference
+
+| Name                  | Operator | Case Insensitive Operator | Count Operator |
+| --------------------- | -------- | ------------------------- | -------------- |
+| Equals                | ==       | ==*                       | #==            |
+| Not Equals            | !=       | !=*                       | #!=            |
+| Greater Than          | \>        | N/A                       | #\>             |
+| Less Than             | \<        | N/A                       | #\<             |
+| Greater Than Or Equal | \>=       | N/A                       | #\>=            |
+| Less Than Or Equal    | \<=       | N/A                       | #\<=            |
+| Starts With           | _=       | _=*                       | N/A            |
+| Does Not Start With   | !_=      | !_=*                      | N/A            |
+| Ends With             | _-=      | _-=*                      | N/A            |
+| Does Not End With     | !_-=     | !_-=*                     | N/A            |
+| Contains              | @=       | @=*                       | N/A            |
+| Does Not Contain      | !@=      | !@=*                      | N/A            |
+| Sounds Like           | ~~       | N/A                       | N/A            |
+| Does Not Sound Like   | !~       | N/A                       | N/A            |
+| Has                   | ^$       | ^$*                       | N/A            |
+| Does Not Have         | !^$      | !^$*                      | N/A            |
+| In                    | ^^       | ^^*                       | N/A            |
+| Not In                | !^^      | !^^*                      | N/A            |
+
+## Basic Examples
+
+### Equality Operations
+
+```csharp
+// Basic equality
+var people = _dbContext.People.ApplyQueryKitFilter("Age == 25").ToList();
+
+// Case-insensitive string comparison
+var people = _dbContext.People.ApplyQueryKitFilter("""FirstName ==* "john" """).ToList();
+
+// Not equals
+var people = _dbContext.People.ApplyQueryKitFilter("""Status != "Inactive" """).ToList();
+```
+
+### Comparison Operations
+
+```csharp
+// Greater than
+var people = _dbContext.People.ApplyQueryKitFilter("Age > 21").ToList();
+
+// Less than or equal
+var people = _dbContext.People.ApplyQueryKitFilter("Rating <= 4.5").ToList();
+```
+
+### String Operations
+
+```csharp
+// Contains (case-sensitive)
+var people = _dbContext.People.ApplyQueryKitFilter("""FirstName @= "John" """).ToList();
+
+// Contains (case-insensitive)
+var people = _dbContext.People.ApplyQueryKitFilter("""FirstName @=* "john" """).ToList();
+
+// Starts with
+var people = _dbContext.People.ApplyQueryKitFilter("""Email _= "hello@" """).ToList();
+
+// Ends with (case-insensitive)
+var people = _dbContext.People.ApplyQueryKitFilter("""Email _-=* "@gmail.com" """).ToList();
+
+// Does not contain
+var people = _dbContext.People.ApplyQueryKitFilter("""FirstName !@=* "test" """).ToList();
+```
+
+### In and Not In Operations
+
+```csharp
+// In operator with multiple values
+var input = """(Age ^^ [20, 30, 40]) && (BirthMonth ^^* ["January", "February", "March"]) || (Id ^^ ["6d623e92-d2cf-4496-a2df-f49fa77328ee"])""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Not in operator
+var people = _dbContext.People.ApplyQueryKitFilter("""Status !^^ ["Inactive", "Deleted"] """).ToList();
+```
+
+## Case-Insensitive Operations
+
+To perform case-insensitive operations, simply append `*` to the operator:
+
+```csharp
+// Case-insensitive equals
+var input = """FirstName ==* "jane" """;
+
+// Case-insensitive contains
+var input = """Email @=* "GMAIL" """;
+
+// Case-insensitive in
+var input = """Status ^^* ["active", "pending"] """;
+```
+
+<Note>
+Case-insensitive operations work with string comparisons and string-based operators like Contains, StartsWith, EndsWith, In, and their negative counterparts.
+</Note>
+
+## Sounds Like Operators
+
+The `~~` (Sounds Like) and `!~` (Does Not Sound Like) operators require soundex configuration on your DbContext.
+
+```csharp
+var people = _dbContext.People.ApplyQueryKitFilter("""FirstName ~~ "Jon" """).ToList();
+```
+
+<Warning>
+Sounds Like operators require a soundex configuration on your DbContext. See the soundex documentation for more information.
+</Warning>
+
+## Important Notes
+
+- String and GUID properties must be wrapped in double quotes
+- `null` doesn't need quotes: `"Title == null"`
+- Boolean properties require explicit comparison: `"Favorite == true"` (not just `"Favorite"`)
+- Dates and times use ISO 8601 format and must be surrounded by double quotes
+
+### Date and Time Examples
+
+```csharp
+// DateOnly
+var filterInput = """Birthday == "2022-07-01" """;
+
+// DateTimeOffset
+var filterInput = """Birthday == "2022-07-01T00:00:03Z" """;
+
+// DateTime
+var filterInput = """Birthday == "2022-07-01T00:00:03" """;
+var filterInput = """Birthday == "2022-07-01T00:00:03+01:00" """;
+
+// TimeOnly
+var filterInput = """Time == "12:30:00" """;
+var filterInput = """Time == "12:30:00.678722" """;
+```
+
+### Escaping Double Quotes
+
+Double quotes can be escaped using C#11 raw-string literal syntax:
+
+```csharp
+var input = """""Title == """lamb is great on a "gee-ro" not a "gy-ro" sandwich""" """"";
+// OR
+var input = """""""""Title == """"lamb is great on a "gee-ro" not a "gy-ro" sandwich"""" """"""""";
+```

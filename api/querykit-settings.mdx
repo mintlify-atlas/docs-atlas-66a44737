@@ -1,0 +1,280 @@
+---
+title: "QueryKitSettings"
+description: "Settings class for configuring QueryKit's parsing behavior, operators, and property mappings"
+---
+
+## Overview
+
+The `QueryKitSettings` class provides a fluent API for configuring QueryKit's behavior. It allows you to customize operator syntax, define property mappings, configure case sensitivity, and set parsing options.
+
+This class is typically used within a configuration action passed to `QueryKitConfiguration` or when using the `ApplyQueryKit` extension methods.
+
+**Namespace:** `QueryKit.Configuration`
+
+## Properties
+
+<ParamField path="PropertyMappings" type="QueryKitPropertyMappings" default="new QueryKitPropertyMappings()">
+  Gets or sets the property mappings for customizing property names and behaviors.
+</ParamField>
+
+### Comparison Operators
+
+<ParamField path="EqualsOperator" type="string" default="ComparisonOperator.EqualsOperator().Operator()">
+  The operator string for equality comparisons. Default is `==`.
+</ParamField>
+
+<ParamField path="NotEqualsOperator" type="string" default="ComparisonOperator.NotEqualsOperator().Operator()">
+  The operator string for inequality comparisons. Default is `!=`.
+</ParamField>
+
+<ParamField path="GreaterThanOperator" type="string" default="ComparisonOperator.GreaterThanOperator().Operator()">
+  The operator string for greater than comparisons. Default is `>`.
+</ParamField>
+
+<ParamField path="LessThanOperator" type="string" default="ComparisonOperator.LessThanOperator().Operator()">
+  The operator string for less than comparisons. Default is `<`.
+</ParamField>
+
+<ParamField path="GreaterThanOrEqualOperator" type="string" default="ComparisonOperator.GreaterThanOrEqualOperator().Operator()">
+  The operator string for greater than or equal comparisons. Default is `>=`.
+</ParamField>
+
+<ParamField path="LessThanOrEqualOperator" type="string" default="ComparisonOperator.LessThanOrEqualOperator().Operator()">
+  The operator string for less than or equal comparisons. Default is `<=`.
+</ParamField>
+
+### String Operators
+
+<ParamField path="ContainsOperator" type="string" default="ComparisonOperator.ContainsOperator().Operator()">
+  The operator string for string contains checks. Default is `@@`.
+</ParamField>
+
+<ParamField path="StartsWithOperator" type="string" default="ComparisonOperator.StartsWithOperator().Operator()">
+  The operator string for string starts with checks. Default is `_=`.
+</ParamField>
+
+<ParamField path="EndsWithOperator" type="string" default="ComparisonOperator.EndsWithOperator().Operator()">
+  The operator string for string ends with checks. Default is `_-`.
+</ParamField>
+
+<ParamField path="NotContainsOperator" type="string" default="ComparisonOperator.NotContainsOperator().Operator()">
+  The operator string for string not contains checks. Default is `!@@`.
+</ParamField>
+
+<ParamField path="NotStartsWithOperator" type="string" default="ComparisonOperator.NotStartsWithOperator().Operator()">
+  The operator string for string not starts with checks. Default is `!_=`.
+</ParamField>
+
+<ParamField path="NotEndsWithOperator" type="string" default="ComparisonOperator.NotEndsWithOperator().Operator()">
+  The operator string for string not ends with checks. Default is `!_-`.
+</ParamField>
+
+### Collection Operators
+
+<ParamField path="InOperator" type="string" default="ComparisonOperator.InOperator().Operator()">
+  The operator string for checking if a value is in a collection. Default is `^^`.
+</ParamField>
+
+<ParamField path="NotInOperator" type="string" default="ComparisonOperator.NotInOperator().Operator()">
+  The operator string for checking if a value is not in a collection. Default is `!^^`.
+</ParamField>
+
+### Sound-alike Operators
+
+<ParamField path="SoundsLikeOperator" type="string" default="ComparisonOperator.SoundsLikeOperator().Operator()">
+  The operator string for phonetic similarity checks. Default is `~=`.
+</ParamField>
+
+<ParamField path="DoesNotSoundLikeOperator" type="string" default="ComparisonOperator.DoesNotSoundLikeOperator().Operator()">
+  The operator string for phonetic dissimilarity checks. Default is `!~=`.
+</ParamField>
+
+### Collection Count Operators
+
+<ParamField path="HasCountEqualToOperator" type="string" default="ComparisonOperator.HasCountEqualToOperator().Operator()">
+  The operator string for checking collection count equality. Default is `#==`.
+</ParamField>
+
+<ParamField path="HasCountNotEqualToOperator" type="string" default="ComparisonOperator.HasCountNotEqualToOperator().Operator()">
+  The operator string for checking collection count inequality. Default is `#!=`.
+</ParamField>
+
+<ParamField path="HasCountGreaterThanOperator" type="string" default="ComparisonOperator.HasCountGreaterThanOperator().Operator()">
+  The operator string for checking if collection count is greater than a value. Default is `#>`.
+</ParamField>
+
+<ParamField path="HasCountLessThanOperator" type="string" default="ComparisonOperator.HasCountLessThanOperator().Operator()">
+  The operator string for checking if collection count is less than a value. Default is `#<`.
+</ParamField>
+
+<ParamField path="HasCountGreaterThanOrEqualOperator" type="string" default="ComparisonOperator.HasCountGreaterThanOrEqualOperator().Operator()">
+  The operator string for checking if collection count is greater than or equal to a value. Default is `#>=`.
+</ParamField>
+
+<ParamField path="HasCountLessThanOrEqualOperator" type="string" default="ComparisonOperator.HasCountLessThanOrEqualOperator().Operator()">
+  The operator string for checking if collection count is less than or equal to a value. Default is `#<=`.
+</ParamField>
+
+<ParamField path="HasOperator" type="string" default="ComparisonOperator.HasOperator().Operator()">
+  The operator string for checking if a collection has any elements. Default is `has`.
+</ParamField>
+
+<ParamField path="DoesNotHaveOperator" type="string" default="ComparisonOperator.DoesNotHaveOperator().Operator()">
+  The operator string for checking if a collection does not have any elements. Default is `!has`.
+</ParamField>
+
+### Logical Operators
+
+<ParamField path="AndOperator" type="string" default="LogicalOperator.AndOperator.Operator()">
+  The operator string for logical AND operations. Default is `&&`.
+</ParamField>
+
+<ParamField path="OrOperator" type="string" default="LogicalOperator.OrOperator.Operator()">
+  The operator string for logical OR operations. Default is `||`.
+</ParamField>
+
+### Case Sensitivity
+
+<ParamField path="CaseInsensitiveAppendix" type="string" default="ComparisonOperator.CaseSensitiveAppendix.ToString()">
+  The appendix string to add to operators for case-insensitive comparisons. Default is `*`.
+</ParamField>
+
+<ParamField path="CaseInsensitiveComparison" type="CaseInsensitiveMode" default="CaseInsensitiveMode.Lower">
+  The mode for performing case-insensitive comparisons. Default is `Lower`.
+</ParamField>
+
+### Parsing Options
+
+<ParamField path="AllowUnknownProperties" type="bool" default="false">
+  When `true`, allows filtering on properties that don't exist on the entity without throwing an exception.
+</ParamField>
+
+<ParamField path="DbContextType" type="Type?" default="null">
+  The DbContext type to use for database-specific operations like phonetic comparisons.
+</ParamField>
+
+<ParamField path="MaxPropertyDepth" type="int?" default="null">
+  The maximum depth for nested property access. Set to limit how deep property chains like `User.Address.City` can go.
+</ParamField>
+
+## Methods
+
+### Property\<TModel\>(Expression\<Func\<TModel, object\>\>? propertySelector)
+
+Creates a property mapping for a specific property on a model.
+
+**Parameters:**
+- `propertySelector` - Expression selecting the property to map
+
+**Returns:** `QueryKitPropertyMapping<TModel>` for fluent configuration
+
+```csharp
+settings.Property<User>(u => u.FirstName)
+    .HasQueryName("name")
+    .PreventSort();
+```
+
+### DerivedProperty\<TModel\>(Expression\<Func\<TModel, object\>\>? propertySelector)
+
+Creates a derived property mapping for computed or custom properties.
+
+**Parameters:**
+- `propertySelector` - Expression defining the derived property logic
+
+**Returns:** `QueryKitPropertyMapping<TModel>` for fluent configuration
+
+```csharp
+settings.DerivedProperty<User>(u => u.FirstName + " " + u.LastName)
+    .HasQueryName("fullName");
+```
+
+### CustomOperation\<TModel\>(Expression\<Func\<TModel, ComparisonOperator, object, bool\>\> operationExpression)
+
+Creates a custom operation mapping for complex filtering logic.
+
+**Parameters:**
+- `operationExpression` - Expression defining the custom operation logic
+
+**Returns:** `QueryKitCustomOperationMapping<TModel>` for fluent configuration
+
+```csharp
+settings.CustomOperation<User>((user, op, value) => 
+    user.Tags.Any(t => t.Name == value.ToString()))
+    .HasName("hasTag");
+```
+
+## Usage Examples
+
+### Basic Configuration
+
+```csharp
+using QueryKit.Configuration;
+
+var config = new QueryKitConfiguration(settings =>
+{
+    // Customize operators
+    settings.EqualsOperator = "eq";
+    settings.ContainsOperator = "contains";
+    
+    // Enable flexible filtering
+    settings.AllowUnknownProperties = true;
+});
+```
+
+### Property Mappings
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    // Alias property names
+    settings.Property<Product>(p => p.Name)
+        .HasQueryName("productName");
+    
+    // Prevent sorting on sensitive fields
+    settings.Property<User>(u => u.PasswordHash)
+        .PreventSort()
+        .PreventFilter();
+    
+    // Create derived properties
+    settings.DerivedProperty<Order>(o => o.Items.Sum(i => i.Price))
+        .HasQueryName("totalPrice");
+});
+```
+
+### Database-Specific Features
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    // Enable phonetic search with PostgreSQL
+    settings.DbContextType = typeof(MyDbContext);
+    
+    // Use sounds-like operator
+    settings.SoundsLikeOperator = "sounds";
+});
+
+// Query: "Name sounds 'Jon'" matches "John", "Jon", etc.
+var results = dbContext.Users
+    .ApplyQueryKitFilter("Name sounds 'Jon'", config)
+    .ToList();
+```
+
+### Case-Insensitive Comparisons
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveAppendix = "i";
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+});
+
+// Query: "Name ==i 'john'" matches "John", "JOHN", "john"
+var results = dbContext.Users
+    .ApplyQueryKitFilter("Name ==i 'john'", config)
+    .ToList();
+```
+
+## See Also
+
+- [QueryKitConfiguration](/api/querykit-configuration) - Runtime configuration class
+- [QueryKitData](/api/querykit-data) - Data transfer object for filters and sorting

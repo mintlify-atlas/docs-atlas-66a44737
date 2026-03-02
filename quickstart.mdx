@@ -1,80 +1,343 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get up and running with QueryKit in minutes. Learn the basics of filtering and sorting your data.
 ---
 
-## Get started in three steps
+This guide will get you from zero to querying in just a few minutes. We'll cover the essential operations you need to start filtering and sorting your data with QueryKit.
 
-Get your documentation site running locally and make your first customization.
+## Prerequisites
 
-### Step 1: Set up your local environment
+Make sure you've [installed QueryKit](/installation) via NuGet:
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash
+dotnet add package QueryKit
+```
 
-### Step 2: Deploy your changes
+## Basic Filtering
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+Let's start with a simple example. Say you have a `Person` entity:
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+```csharp
+public class Person
+{
+    public Guid Id { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public int Age { get; set; }
+    public string Email { get; set; }
+}
+```
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+### Simple Filter
 
-### Step 3: Go live
+Apply a filter using the `ApplyQueryKitFilter` extension method:
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+```csharp
+using QueryKit;
 
-## Next steps
+var filterInput = """Age > 18""";
+var adults = _dbContext.People
+    .ApplyQueryKitFilter(filterInput)
+    .ToList();
+```
 
-Now that you have your docs running, explore these key features:
+### Multiple Conditions
 
-<CardGroup cols={2}>
+Combine multiple conditions using `&&` (and) or `||` (or):
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
+```csharp
+var filterInput = """FirstName == \"Jane\" && Age > 18""";
+var results = _dbContext.People
+    .ApplyQueryKitFilter(filterInput)
+    .ToList();
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  String and Guid values must be wrapped in double quotes. Use raw string literals (`"""..."""`)
+  in C# 11+ for easier escaping.
 </Note>
+
+## Basic Sorting
+
+Sorting is even simpler - just provide a comma-delimited list of properties:
+
+```csharp
+var sorted = _dbContext.People
+    .ApplyQueryKitSort("LastName, FirstName desc")
+    .ToList();
+```
+
+<Tip>
+  Use `asc` or `desc` to specify sort direction. If not specified, QueryKit assumes ascending order.
+  You can also use Sieve-style syntax with a `-` prefix for descending (e.g., `-Age`).
+</Tip>
+
+## Combining Filter and Sort
+
+You can chain filtering and sorting operations:
+
+```csharp
+var filterInput = """Age >= 21""";
+var results = _dbContext.People
+    .ApplyQueryKitFilter(filterInput)
+    .ApplyQueryKitSort("LastName, Age desc")
+    .ToList();
+```
+
+Or use the combined `ApplyQueryKit` method:
+
+```csharp
+var results = _dbContext.People
+    .ApplyQueryKit(new QueryKitData
+    {
+        Filters = """Age >= 21""",
+        SortOrder = "LastName, Age desc"
+    })
+    .ToList();
+```
+
+## Common Operators
+
+Here are the most commonly used operators to get you started:
+
+### Comparison Operators
+
+| Operator | Description | Example |
+|----------|-------------|-------|
+| `==` | Equals | `Age == 25` |
+| `!=` | Not equals | `Status != \"Inactive\"` |
+| `>` | Greater than | `Age > 18` |
+| `<` | Less than | `Rating < 4.5` |
+| `>=` | Greater than or equal | `Age >= 21` |
+| `<=` | Less than or equal | `Age <= 65` |
+
+### String Operators
+
+| Operator | Description | Example |
+|----------|-------------|-------|
+| `@=` | Contains | `FirstName @= \"John\"` |
+| `@=*` | Contains (case-insensitive) | `Email @=* \"gmail\"` |
+| `_=` | Starts with | `LastName _= \"Sm\"` |
+| `_=*` | Starts with (case-insensitive) | `FirstName _=* \"j\"` |
+| `_-=` | Ends with | `Email _-= \".com\"` |
+| `_-=*` | Ends with (case-insensitive) | `Email _-=* \".COM\"` |
+
+<Tip>
+  Append `*` to any string operator to make it case-insensitive!
+</Tip>
+
+### Logical Operators
+
+```csharp
+// AND - both conditions must be true
+var input = """Age > 18 && Status == \"Active\"""";
+
+// OR - at least one condition must be true  
+var input = """FirstName == \"John\" || FirstName == \"Jane\"""";
+
+// Parentheses for complex logic
+var input = """(Age > 18 && Age < 65) || Status == \"Premium\"""";
+```
+
+## Working with Different Data Types
+
+<Steps>
+  <Step title="Strings and GUIDs">
+    Wrap in double quotes:
+    ```csharp
+    var input = """FirstName == \"John\"""";
+    var input = """Id == \"6d623e92-d2cf-4496-a2df-f49fa77328ee\"""";
+    ```
+  </Step>
+  
+  <Step title="Numbers">
+    Use directly without quotes:
+    ```csharp
+    var input = """Age == 25""";
+    var input = """Price > 99.99""";
+    ```
+  </Step>
+  
+  <Step title="Booleans">
+    Must use explicit comparison:
+    ```csharp
+    var input = """IsActive == true""";
+    var input = """IsDeleted == false""";
+    ```
+  </Step>
+  
+  <Step title="Dates and Times">
+    Use ISO 8601 format with quotes:
+    ```csharp
+    var input = """Birthday == \"2022-07-01\"""";
+    var input = """CreatedAt == \"2022-07-01T00:00:03Z\"""";
+    var input = """Time == \"12:30:00\"""";
+    ```
+  </Step>
+  
+  <Step title="Null Values">
+    No quotes needed:
+    ```csharp
+    var input = """MiddleName == null""";
+    var input = """DeletedAt != null""";
+    ```
+  </Step>
+</Steps>
+
+## Property Aliases with Configuration
+
+Customize property names for a better API experience:
+
+```csharp
+var filterInput = """first == \"Jane\" && age > 18""";
+
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName).HasQueryName("first");
+    config.Property<Person>(x => x.Age).HasQueryName("age");
+});
+
+var results = _dbContext.People
+    .ApplyQueryKitFilter(filterInput, config)
+    .ApplyQueryKitSort("first, age desc", config)
+    .ToList();
+```
+
+## Real-World Example
+
+Here's a complete example showing QueryKit in a typical Web API scenario:
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using QueryKit;
+
+[ApiController]
+[Route("api/[controller]")]
+public class PeopleController : ControllerBase
+{
+    private readonly AppDbContext _dbContext;
+    
+    public PeopleController(AppDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+    
+    [HttpGet]
+    public async Task<IActionResult> GetPeople(
+        [FromQuery] string? filters,
+        [FromQuery] string? sortOrder)
+    {
+        var query = _dbContext.People.AsQueryable();
+        
+        // Apply filters if provided
+        if (!string.IsNullOrWhiteSpace(filters))
+        {
+            query = query.ApplyQueryKitFilter(filters);
+        }
+        
+        // Apply sorting if provided
+        if (!string.IsNullOrWhiteSpace(sortOrder))
+        {
+            query = query.ApplyQueryKitSort(sortOrder);
+        }
+        
+        var results = await query.ToListAsync();
+        return Ok(results);
+    }
+}
+```
+
+Clients can now make requests like:
+
+```bash
+GET /api/people?filters=Age >= 21 && Status == "Active"&sortOrder=LastName, FirstName
+```
+
+## Advanced Features Preview
+
+Once you're comfortable with the basics, QueryKit offers many advanced features:
+
+<CardGroup cols={2}>
+  <Card title="Property Grouping" icon="layer-group">
+    Search across multiple properties at once:
+    ```csharp
+    (FirstName, LastName, Email) @=* "john"
+    ```
+  </Card>
+  
+  <Card title="Collection Filtering" icon="list">
+    Filter into nested collections:
+    ```csharp
+    Ingredients.Name == "salt"
+    Ingredients #>= 3
+    ```
+  </Card>
+  
+  <Card title="Derived Properties" icon="function">
+    Create custom computed properties:
+    ```csharp
+    config.DerivedProperty<Person>(
+      p => p.FirstName + " " + p.LastName
+    ).HasQueryName("fullname");
+    ```
+  </Card>
+  
+  <Card title="Arithmetic Expressions" icon="calculator">
+    Perform calculations in queries:
+    ```csharp
+    (Price - Cost) / Price > 0.2
+    ```
+  </Card>
+</CardGroup>
+
+## Error Handling
+
+QueryKit throws specific exceptions for different error scenarios:
+
+```csharp
+using QueryKit.Exceptions;
+
+try
+{
+    var results = _dbContext.People
+        .ApplyQueryKitFilter(userInput)
+        .ToList();
+}
+catch (ParsingException ex)
+{
+    // Invalid syntax or operators
+    return BadRequest($"Invalid filter syntax: {ex.Message}");
+}
+catch (UnknownFilterPropertyException ex)
+{
+    // Property doesn't exist
+    return BadRequest($"Unknown property: {ex.Message}");
+}
+catch (QueryKitException ex)
+{
+    // Base exception for all QueryKit errors
+    return BadRequest($"Query error: {ex.Message}");
+}
+```
+
+## Next Steps
+
+You now know the fundamentals of QueryKit! Here's what to explore next:
+
+<CardGroup cols={2}>
+  <Card title="View Full README" icon="book" href="https://github.com/pdevito3/QueryKit/blob/main/README.md">
+    Explore all operators, configuration options, and advanced features
+  </Card>
+  
+  <Card title="Browse Examples" icon="code" href="https://github.com/pdevito3/QueryKit/tree/main/QueryKit.IntegrationTests">
+    Check out integration tests for real-world usage examples
+  </Card>
+  
+  <Card title="Report Issues" icon="bug" href="https://github.com/pdevito3/QueryKit/issues">
+    Found a bug or have a feature request? Let us know on GitHub
+  </Card>
+  
+  <Card title="Contribute" icon="github" href="https://github.com/pdevito3/QueryKit">
+    QueryKit is open source - contributions are welcome!
+  </Card>
+</CardGroup>

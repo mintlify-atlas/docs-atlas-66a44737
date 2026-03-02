@@ -1,0 +1,235 @@
+---
+title: 'ApplyQueryKitFilter'
+description: 'Apply filtering operations to IQueryable and IEnumerable collections using string-based filter expressions'
+---
+
+The `ApplyQueryKitFilter` extension methods parse and apply filter expressions to your collections, translating string-based queries into LINQ expressions.
+
+## IQueryable Extension
+
+Applies a filter expression to an `IQueryable<TEntity>` collection.
+
+### Method Signature
+
+```csharp
+public static IQueryable<TEntity> ApplyQueryKitFilter<TEntity>(
+    this IQueryable<TEntity> source, 
+    string filter, 
+    IQueryKitConfiguration? config = null)
+    where TEntity : class
+```
+
+### Parameters
+
+<ParamField path="source" type="IQueryable<TEntity>" required>
+  The source queryable collection to filter
+</ParamField>
+
+<ParamField path="filter" type="string" required>
+  The filter expression string to parse and apply
+  
+  **Syntax examples:**
+  - Simple comparison: `"Age > 25"`
+  - Logical operators: `"Age > 25 && IsActive == true"`
+  - String operations: `"Name @=* \"john\""` (case-insensitive contains)
+  - Nested properties: `"Address.City == \"Seattle\""`
+  - Collection operators: `"Tags ^^ \"Featured\""` (has)
+</ParamField>
+
+<ParamField path="config" type="IQueryKitConfiguration?" default="null">
+  Optional configuration to customize operator syntax, property mappings, and parsing behavior
+</ParamField>
+
+### Returns
+
+**Type:** `IQueryable<TEntity>`
+
+Returns the filtered queryable collection. If the filter string is null or whitespace, returns the original source unchanged.
+
+### Description
+
+This method parses the filter string into an expression tree and applies it to the queryable collection using the `Where` clause. The filter is translated into efficient SQL when used with Entity Framework or other LINQ providers.
+
+### Example - Basic Filtering
+
+```csharp
+using QueryKit;
+
+// Simple equality filter
+var activeUsers = dbContext.Users
+    .ApplyQueryKitFilter("IsActive == true")
+    .ToList();
+
+// Comparison operators
+var seniorUsers = dbContext.Users
+    .ApplyQueryKitFilter("Age >= 30")
+    .ToList();
+```
+
+### Example - Logical Operators
+
+```csharp
+// AND operator
+var filteredUsers = dbContext.Users
+    .ApplyQueryKitFilter("Age > 25 && Department == \"Engineering\"")
+    .ToList();
+
+// OR operator with parentheses
+var results = dbContext.Users
+    .ApplyQueryKitFilter("(Age < 25 || Age > 60) && IsActive == true")
+    .ToList();
+```
+
+### Example - String Operations
+
+```csharp
+// Contains (case-sensitive)
+var users = dbContext.Users
+    .ApplyQueryKitFilter("Name @= \"John\"")
+    .ToList();
+
+// Contains (case-insensitive)
+var users = dbContext.Users
+    .ApplyQueryKitFilter("Email @=* \"@example.com\"")
+    .ToList();
+
+// Starts with
+var users = dbContext.Users
+    .ApplyQueryKitFilter("LastName _= \"Smith\"")
+    .ToList();
+```
+
+### Example - Custom Configuration
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.EqualsOperator = "eq";
+    settings.GreaterThanOperator = "gt";
+    settings.ContainsOperator = "contains";
+});
+
+var filtered = dbContext.Users
+    .ApplyQueryKitFilter("Age gt 25", config)
+    .ToList();
+```
+
+---
+
+## IEnumerable Extension
+
+Applies a filter expression to an `IEnumerable<TEntity>` collection.
+
+### Method Signature
+
+```csharp
+public static IEnumerable<TEntity> ApplyQueryKitFilter<TEntity>(
+    this IEnumerable<TEntity> source, 
+    string filter, 
+    IQueryKitConfiguration? config = null)
+    where TEntity : class
+```
+
+### Parameters
+
+<ParamField path="source" type="IEnumerable<TEntity>" required>
+  The source enumerable collection to filter
+</ParamField>
+
+<ParamField path="filter" type="string" required>
+  The filter expression string to parse and apply
+</ParamField>
+
+<ParamField path="config" type="IQueryKitConfiguration?" default="null">
+  Optional configuration to customize operator syntax, property mappings, and parsing behavior
+</ParamField>
+
+### Returns
+
+**Type:** `IEnumerable<TEntity>`
+
+Returns the filtered enumerable collection. If the filter string is null or whitespace, returns the original source unchanged.
+
+### Description
+
+This method parses the filter string into an expression tree, compiles it to a delegate, and applies it to the enumerable collection. This is designed for in-memory collections and executes the filter using LINQ to Objects.
+
+### Example - In-Memory Filtering
+
+```csharp
+using QueryKit;
+
+// Filter an in-memory list
+var userList = GetUsersFromCache();
+
+var filtered = userList
+    .ApplyQueryKitFilter("Age > 30 && IsActive == true")
+    .ToList();
+```
+
+### Example - Complex Expressions
+
+```csharp
+var employees = GetEmployeeList();
+
+var filtered = employees
+    .ApplyQueryKitFilter(
+        "(Department == \"Sales\" && Salary > 50000) || Role == \"Manager\"")
+    .ToList();
+```
+
+---
+
+## Supported Operators
+
+### Comparison Operators
+
+| Operator | Default Syntax | Description |
+|----------|----------------|-------------|
+| Equals | `==` | Equal to |
+| Not Equals | `!=` | Not equal to |
+| Greater Than | `>` | Greater than |
+| Less Than | `<` | Less than |
+| Greater Than or Equal | `>=` | Greater than or equal to |
+| Less Than or Equal | `<=` | Less than or equal to |
+
+### String Operators
+
+| Operator | Default Syntax | Description |
+|----------|----------------|-------------|
+| Contains | `@=` | Contains substring |
+| Starts With | `_=` | Starts with substring |
+| Ends With | `_-=` | Ends with substring |
+| Not Contains | `!@=` | Does not contain |
+| Not Starts With | `!_=` | Does not start with |
+| Not Ends With | `!_-=` | Does not end with |
+
+### Collection Operators
+
+| Operator | Default Syntax | Description |
+|----------|----------------|-------------|
+| In | `^^` | Value is in collection |
+| Not In | `!^^` | Value is not in collection |
+| Has | `^^` | Collection has item |
+| Does Not Have | `!^^` | Collection does not have item |
+
+### Logical Operators
+
+| Operator | Syntax | Description |
+|----------|--------|-------------|
+| AND | `&&` | Logical AND |
+| OR | `||` | Logical OR |
+
+### Case Insensitivity
+
+Add `*` after string operators for case-insensitive comparison:
+- `@=*` - Contains (case-insensitive)
+- `_=*` - Starts with (case-insensitive)
+- `_-=*` - Ends with (case-insensitive)
+
+---
+
+## See Also
+
+- [ApplyQueryKit](/api/apply-querykit) - Apply both filtering and sorting
+- [ApplyQueryKitSort](/api/apply-querykit-sort) - Apply sorting only

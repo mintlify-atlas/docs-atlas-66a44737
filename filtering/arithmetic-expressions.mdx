@@ -1,0 +1,301 @@
+---
+title: "Arithmetic Expressions"
+description: "Perform calculations directly within filter queries using arithmetic operators"
+---
+
+QueryKit supports arithmetic expressions in filters, allowing you to perform calculations directly within your queries. This enables powerful filtering capabilities based on computed values.
+
+## Supported Operators
+
+QueryKit supports all standard arithmetic operators:
+
+| Operator | Description | Precedence | Example |
+|----------|-------------|------------|----------|
+| `+`      | Addition    | 1          | `Age + 5` |
+| `-`      | Subtraction | 1          | `Price - Cost` |
+| `*`      | Multiplication | 2       | `Price * Quantity` |
+| `/`      | Division    | 2          | `Total / Count` |
+| `%`      | Modulo      | 2          | `Id % 2` |
+
+<Note>
+Multiplication, division, and modulo have higher precedence than addition and subtraction, following standard mathematical order of operations.
+</Note>
+
+## Basic Operations
+
+### Addition
+
+```csharp
+// Find records where Age + Rating is greater than 50
+var input = "(Age + Rating) > 50";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Subtraction
+
+```csharp
+// Find records where Age - Rating is positive
+var input = "(Age - Rating) > 0";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Multiplication
+
+```csharp
+// Find records where Price * Quantity exceeds 1000
+var input = "(Price * Quantity) > 1000";
+var orders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+### Division
+
+```csharp
+// Find records where Total / Count is less than 100
+var input = "(Total / Count) < 100";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+### Modulo
+
+```csharp
+// Find records where ID is even
+var input = "(Id % 2) == 0";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+
+// Find records where ID is divisible by 5
+var input = "(Id % 5) == 0";
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+## Operator Precedence
+
+Arithmetic expressions follow standard mathematical operator precedence:
+
+```csharp
+// Multiplication and division before addition and subtraction
+var input = "(Price + Tax * Rate) > 100";  // Tax * Rate is calculated first
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+
+// Use parentheses to override precedence
+var input = "((Price + Tax) * Rate) > 100"; // Addition happens first
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+<Note>
+Always use parentheses when you want to ensure a specific order of operations, even if not strictly required. This makes your queries more readable and maintainable.
+</Note>
+
+## Mixing Properties and Literals
+
+You can combine entity properties with literal numeric values:
+
+```csharp
+// Property with literal
+var input = "(Age - 18) >= 0";   // Age minus 18
+var adults = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiple properties with literals
+var input = "(Price * 1.1 + ShippingCost) <= Budget";
+var affordableItems = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Tax calculation
+var input = "(Price * 1.13) > 100"; // Price with 13% tax
+var expensiveItems = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+```
+
+## Complex Arithmetic Expressions
+
+### Combined with Logical Operators
+
+```csharp
+// Arithmetic with logical operators
+var input = """(Price - Cost) > 300 && Category == "Electronics" """;
+var profitableElectronics = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Multiple conditions
+var input = "(Revenue - Expenses) > 1000 && (Marketing / Revenue) < 0.3";
+var profitableCompanies = _dbContext.Companies.ApplyQueryKitFilter(input).ToList();
+```
+
+### Multiple Arithmetic Comparisons
+
+```csharp
+// Multiple arithmetic expressions
+var input = "(Score1 + Score2) > 150 && (Score1 - Score2) < 20";
+var balancedScores = _dbContext.Games.ApplyQueryKitFilter(input).ToList();
+
+// Complex range checking
+var input = "(Total - Discount) >= 100 && (Total - Discount) <= 500";
+var midRangeOrders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+### Nested Arithmetic Expressions
+
+```csharp
+// Calculate profit margin
+var input = "((Revenue - Expenses) / Revenue) > 0.1";
+var profitableItems = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+
+// Complex business calculation
+var input = "((Price - Cost) / Price * 100) >= 25"; // 25% margin or more
+var goodMargins = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+```
+
+## Practical Examples
+
+### Profit Margin Calculation
+
+```csharp
+// Calculate profit margin and filter
+var profitableItems = _dbContext.Products
+    .ApplyQueryKitFilter("((Price - Cost) / Price) > 0.2")
+    .ToList(); // 20% or more profit margin
+```
+
+### Shipping Cost Ratio
+
+```csharp
+// Find orders with high shipping ratio
+var expensiveShipping = _dbContext.Orders
+    .ApplyQueryKitFilter("(ShippingCost / TotalAmount) > 0.15")
+    .ToList(); // Shipping is more than 15% of total
+```
+
+### Customer Lifetime Value
+
+```csharp
+// Complex business logic in one filter
+var qualifiedCustomers = _dbContext.Customers
+    .ApplyQueryKitFilter("""
+        (TotalPurchases / NumberOfOrders) > 500 && 
+        ((LastOrderDate - FirstOrderDate) / 365) >= 2
+    """)
+    .ToList();
+// Average order over $500 and 2+ years of history
+```
+
+### Discount Validation
+
+```csharp
+// Ensure discount doesn't exceed limits
+var validDiscounts = _dbContext.Orders
+    .ApplyQueryKitFilter("(DiscountAmount / OriginalPrice) <= 0.5")
+    .ToList(); // Discount is 50% or less
+```
+
+### Age-Based Filtering
+
+```csharp
+// Calculate age from birth year
+var input = "(2024 - BirthYear) >= 18";
+var adults = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Tax Calculations
+
+```csharp
+// Calculate total with tax
+var input = "(SubTotal * 1.13) > 100"; // Total with 13% tax over $100
+var orders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+## Supported Features
+
+### Numeric Types
+
+All numeric types are supported:
+
+- `int`, `long`, `short`, `byte`
+- `decimal`, `double`, `float`
+- Nullable variants of all numeric types
+
+```csharp
+// Works with all numeric types
+var input = "(IntValue + LongValue) > 1000";
+var input = "(DecimalValue * DoubleValue) < 500.5";
+var input = "(FloatValue / IntValue) >= 2.5";
+```
+
+### Automatic Type Conversion
+
+Compatible numeric types are automatically converted:
+
+```csharp
+// Mixing int and decimal
+var input = "(IntAge + DecimalRating) > 50";
+
+// Mixing different numeric types
+var input = "(LongValue - IntValue) * DoubleMultiplier > 1000";
+```
+
+<Note>
+QueryKit handles numeric type conversions automatically, ensuring calculations work correctly even when mixing different numeric types.
+</Note>
+
+### Entity Framework Translation
+
+All arithmetic expressions are translated to efficient SQL queries:
+
+```csharp
+// This QueryKit filter:
+var input = "((Price - Cost) / Price) > 0.2";
+
+// Translates to SQL similar to:
+// WHERE ((Price - Cost) / Price) > 0.2
+```
+
+## Important Considerations
+
+### Parentheses Are Required
+
+Arithmetic expressions must be wrapped in parentheses:
+
+```csharp
+// ✅ Correct
+var input = "(Age + Rating) > 50";
+
+// ❌ Incorrect
+var input = "Age + Rating > 50";
+```
+
+### Division by Zero
+
+Be careful with division operations that might result in division by zero:
+
+```csharp
+// Potentially problematic
+var input = "(Total / Count) > 100";
+
+// Better - add a check
+var input = "Count > 0 && (Total / Count) > 100";
+```
+
+<Warning>
+Always consider edge cases like division by zero, null values, and overflow when using arithmetic expressions in your filters.
+</Warning>
+
+### Null Handling
+
+Nullable numeric properties may affect calculations:
+
+```csharp
+// If OptionalValue is null, the expression may not behave as expected
+var input = "(RequiredValue + OptionalValue) > 100";
+
+// Consider filtering out nulls first
+var input = "OptionalValue != null && (RequiredValue + OptionalValue) > 100";
+```
+
+## Performance Tips
+
+1. **Use Computed Columns**: For frequently used calculations, consider adding computed columns in your database
+2. **Index Supporting Columns**: Index the base columns used in arithmetic expressions
+3. **Simplify When Possible**: Simpler expressions generally perform better
+
+```csharp
+// Less efficient - complex calculation
+var input = "((A + B) * (C - D) / E) > 100";
+
+// More efficient - simplified logic
+var input = "(A + B) > 50 && (C - D) > 10";
+```

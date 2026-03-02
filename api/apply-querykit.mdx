@@ -1,0 +1,165 @@
+---
+title: 'ApplyQueryKit'
+description: 'Apply both filtering and sorting operations to IQueryable and IEnumerable collections'
+---
+
+The `ApplyQueryKit` extension methods provide a convenient way to apply both filtering and sorting operations to your collections in a single call.
+
+## IQueryable Extension
+
+Applies QueryKit filtering and sorting to an `IQueryable<TEntity>` collection.
+
+### Method Signature
+
+```csharp
+public static IQueryable<TEntity> ApplyQueryKit<TEntity>(
+    this IQueryable<TEntity> source, 
+    QueryKitData queryKitData)
+    where TEntity : class
+```
+
+### Parameters
+
+<ParamField path="source" type="IQueryable<TEntity>" required>
+  The source queryable collection to apply operations to
+</ParamField>
+
+<ParamField path="queryKitData" type="QueryKitData" required>
+  Configuration object containing filter and sort specifications
+  
+  **Properties:**
+  - `Filters` (string?): Filter expression to apply
+  - `SortOrder` (string?): Sort expression to apply
+  - `Configuration` (QueryKitConfiguration?): Optional configuration for parsing behavior
+</ParamField>
+
+### Returns
+
+**Type:** `IQueryable<TEntity>`
+
+Returns the filtered and sorted queryable collection.
+
+### Description
+
+This method applies both filtering and sorting operations to an `IQueryable<TEntity>` collection based on the provided `QueryKitData`. If filters are specified, they are applied first using `ApplyQueryKitFilter`. If a sort order is specified, it is applied next using `ApplyQueryKitSort`.
+
+### Example
+
+```csharp
+using QueryKit;
+using QueryKit.Configuration;
+
+// Create QueryKit data with filter and sort
+var queryKitData = new QueryKitData
+{
+    Filters = "Age > 25 && IsActive == true",
+    SortOrder = "LastName asc, FirstName asc"
+};
+
+// Apply to IQueryable
+var results = dbContext.Users
+    .ApplyQueryKit(queryKitData)
+    .ToList();
+```
+
+### Example with Configuration
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.EqualsOperator = "eq";
+    settings.GreaterThanOperator = "gt";
+});
+
+var queryKitData = new QueryKitData
+{
+    Filters = "Age gt 25",
+    SortOrder = "Age desc",
+    Configuration = config
+};
+
+var results = dbContext.Users
+    .ApplyQueryKit(queryKitData)
+    .ToList();
+```
+
+---
+
+## IEnumerable Extension
+
+Applies QueryKit filtering and sorting to an `IEnumerable<TEntity>` collection.
+
+### Method Signature
+
+```csharp
+public static IEnumerable<TEntity> ApplyQueryKit<TEntity>(
+    this IEnumerable<TEntity> source, 
+    QueryKitData queryKitData)
+    where TEntity : class
+```
+
+### Parameters
+
+<ParamField path="source" type="IEnumerable<TEntity>" required>
+  The source enumerable collection to apply operations to
+</ParamField>
+
+<ParamField path="queryKitData" type="QueryKitData" required>
+  Configuration object containing filter and sort specifications
+  
+  **Properties:**
+  - `Filters` (string?): Filter expression to apply
+  - `SortOrder` (string?): Sort expression to apply
+  - `Configuration` (QueryKitConfiguration?): Optional configuration for parsing behavior
+</ParamField>
+
+### Returns
+
+**Type:** `IEnumerable<TEntity>`
+
+Returns the filtered and sorted enumerable collection.
+
+### Description
+
+This method applies both filtering and sorting operations to an `IEnumerable<TEntity>` collection based on the provided `QueryKitData`. The filter expressions are compiled to delegates for in-memory execution. This is useful for collections that are already loaded into memory.
+
+### Example
+
+```csharp
+using QueryKit;
+using QueryKit.Configuration;
+
+// Apply to in-memory collection
+var users = GetUsersFromCache();
+
+var queryKitData = new QueryKitData
+{
+    Filters = "Department == \"Engineering\"",
+    SortOrder = "HireDate desc"
+};
+
+var results = users
+    .ApplyQueryKit(queryKitData)
+    .ToList();
+```
+
+### Example with Complex Filter
+
+```csharp
+var queryKitData = new QueryKitData
+{
+    Filters = "(Salary > 50000 && Department == \"Sales\") || Role == \"Manager\"",
+    SortOrder = "Salary desc, LastName asc"
+};
+
+var filteredUsers = userList
+    .ApplyQueryKit(queryKitData)
+    .ToList();
+```
+
+---
+
+## See Also
+
+- [ApplyQueryKitFilter](/api/apply-querykit-filter) - Apply filtering only
+- [ApplyQueryKitSort](/api/apply-querykit-sort) - Apply sorting only

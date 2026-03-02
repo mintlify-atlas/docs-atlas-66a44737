@@ -1,0 +1,131 @@
+---
+title: "Logical Operators"
+description: "Combine multiple filter conditions using logical operators in QueryKit"
+---
+
+QueryKit supports logical operators to combine multiple filter conditions, allowing you to create complex queries with AND/OR logic.
+
+## Available Operators
+
+| Operator | Symbol | Description |
+|----------|--------|-------------|
+| AND      | `&&`   | Both conditions must be true |
+| OR       | `||`   | At least one condition must be true |
+
+## AND Operator
+
+Use `&&` to combine conditions where **both** must be true:
+
+```csharp
+// Both conditions must match
+var input = """FirstName == "Jane" && Age < 10""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiple AND conditions
+var input = """FirstName == "Jane" && Age > 18 && Status == "Active" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## OR Operator
+
+Use `||` to combine conditions where **at least one** must be true:
+
+```csharp
+// Either condition can match
+var input = """FirstName == "Jane" || FirstName == "John" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Multiple OR conditions
+var input = """Status == "Active" || Status == "Pending" || Status == "Review" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Order of Operations
+
+You can control the order of operations using parentheses to group conditions:
+
+```csharp
+// Parentheses define evaluation order
+var input = """(FirstName == "Jane" && Age < 10) || FirstName == "John" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Complex nested logic
+var input = """((FirstName == "Jane" || FirstName == "John") && Age > 18) || Status == "Admin" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+<Note>
+Parentheses are evaluated first, just like in mathematical expressions. Use them to create precise logical conditions.
+</Note>
+
+## Combining AND and OR
+
+You can mix AND and OR operators in the same query:
+
+```csharp
+// Mix operators with proper grouping
+var input = """(FirstName == "Jane" || FirstName == "John") && Age > 21 && Status != "Inactive" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Complex business logic
+var input = """
+    (Status == "Active" && Age >= 18) || 
+    (Status == "Pending" && Verified == true) || 
+    Role == "Admin"
+""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Complex Examples
+
+### Multi-Field Search with Filters
+
+```csharp
+var input = """
+    (FirstName @=* "smith" || LastName @=* "smith") && 
+    Age > 25 && 
+    (Status == "Active" || Status == "Premium")
+""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Date Range with Additional Conditions
+
+```csharp
+var input = """
+    ((CreatedDate >= "2023-01-01" && CreatedDate <= "2023-12-31") || 
+     UpdatedDate >= "2024-01-01") && 
+    Status == "Published"
+""";
+var articles = _dbContext.Articles.ApplyQueryKitFilter(input).ToList();
+```
+
+### Nested Property Filters
+
+```csharp
+var input = """
+    (Author.Name == "John Doe" || Author.Status == "Verified") && 
+    Rating > 4.0 && 
+    (PublishedDate >= "2024-01-01" || Featured == true)
+""";
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+## Best Practices
+
+1. **Use Parentheses for Clarity**: Even when not strictly required, parentheses make complex queries easier to read
+2. **Group Related Conditions**: Keep related conditions together for better maintainability
+3. **Test Complex Queries**: Always test complex logical combinations to ensure they produce expected results
+4. **Consider Performance**: Multiple OR conditions may be less efficient than other approaches like the IN operator
+
+```csharp
+// Less efficient
+var input = """Status == "Active" || Status == "Pending" || Status == "Review" """;
+
+// More efficient
+var input = """Status ^^ ["Active", "Pending", "Review"] """;
+```
+
+<Warning>
+Be mindful of operator precedence. When in doubt, use explicit parentheses to ensure your query evaluates as intended.
+</Warning>

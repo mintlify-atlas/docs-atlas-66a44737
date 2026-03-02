@@ -1,0 +1,379 @@
+---
+title: "Filtering Enums"
+description: "Filter enum properties using their integer values in QueryKit"
+---
+
+QueryKit allows you to filter enum properties by using their underlying integer values. This provides a straightforward way to query enum-based fields.
+
+## Basic Enum Filtering
+
+Filter enums using their integer representation:
+
+```csharp
+// Filter by enum value
+var input = "BirthMonth == 1";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+public enum BirthMonthEnum
+{
+    January = 1,
+    February = 2,
+    March = 3,
+    April = 4,
+    May = 5,
+    June = 6,
+    July = 7,
+    August = 8,
+    September = 9,
+    October = 10,
+    November = 11,
+    December = 12
+}
+```
+
+## Entity Example
+
+```csharp
+public class Person
+{
+    public Guid Id { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public BirthMonthEnum BirthMonth { get; set; }
+    public StatusEnum Status { get; set; }
+}
+
+public enum BirthMonthEnum
+{
+    January = 1,
+    February = 2,
+    March = 3,
+    // ...
+}
+
+public enum StatusEnum
+{
+    Inactive = 0,
+    Active = 1,
+    Pending = 2,
+    Suspended = 3
+}
+```
+
+## All Comparison Operators
+
+Enum filtering supports all standard comparison operators:
+
+### Equality
+
+```csharp
+// Equals
+var input = "BirthMonth == 1"; // January
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Not equals
+var input = "Status != 0"; // Not Inactive
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Comparison Operators
+
+```csharp
+// Greater than
+var input = "BirthMonth > 6"; // Born after June
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Less than
+var input = "BirthMonth < 4"; // Born before April
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Greater than or equal
+var input = "Status >= 1"; // Active or higher
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Less than or equal
+var input = "BirthMonth <= 3"; // January through March
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### In Operator
+
+```csharp
+// Multiple enum values
+var input = "BirthMonth ^^ [1, 2, 12]"; // January, February, or December
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Not in
+var input = "Status !^^ [0, 3]"; // Not Inactive or Suspended
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Complex Examples
+
+### Combining Enum Filters
+
+```csharp
+// Multiple enum conditions
+var input = "Status == 1 && BirthMonth >= 6";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+// Active people born in second half of year
+```
+
+### Enum with Other Filters
+
+```csharp
+// Enum with string and numeric filters
+var input = """Status == 1 && BirthMonth ^^ [1, 2, 3] && FirstName _= "J" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+// Active people born in Q1 with names starting with J
+```
+
+### Complex Logical Expressions
+
+```csharp
+// Complex enum logic
+var input = "(Status == 1 || Status == 2) && (BirthMonth <= 3 || BirthMonth >= 10)";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+// Active or Pending people born in Q1 or Q4
+```
+
+## Practical Use Cases
+
+### Status-Based Filtering
+
+```csharp
+public enum OrderStatus
+{
+    Draft = 0,
+    Submitted = 1,
+    Processing = 2,
+    Shipped = 3,
+    Delivered = 4,
+    Cancelled = 5
+}
+
+// Active orders (not draft or cancelled)
+var input = "Status > 0 && Status != 5";
+var activeOrders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+
+// Orders that can be modified
+var input = "Status ^^ [0, 1]"; // Draft or Submitted
+var editableOrders = _dbContext.Orders.ApplyQueryKitFilter(input).ToList();
+```
+
+### Priority Filtering
+
+```csharp
+public enum Priority
+{
+    Low = 1,
+    Medium = 2,
+    High = 3,
+    Critical = 4
+}
+
+// High priority items
+var input = "Priority >= 3";
+var urgentTasks = _dbContext.Tasks.ApplyQueryKitFilter(input).ToList();
+
+// Non-critical items
+var input = "Priority < 4";
+var regularTasks = _dbContext.Tasks.ApplyQueryKitFilter(input).ToList();
+```
+
+### Category Filtering
+
+```csharp
+public enum ProductCategory
+{
+    Electronics = 1,
+    Clothing = 2,
+    Books = 3,
+    Home = 4,
+    Sports = 5
+}
+
+// Multiple categories
+var input = "Category ^^ [1, 3, 5]"; // Electronics, Books, Sports
+var products = _dbContext.Products.ApplyQueryKitFilter(input).ToList();
+```
+
+### Day of Week Filtering
+
+```csharp
+public enum DayOfWeek
+{
+    Sunday = 0,
+    Monday = 1,
+    Tuesday = 2,
+    Wednesday = 3,
+    Thursday = 4,
+    Friday = 5,
+    Saturday = 6
+}
+
+// Weekday events
+var input = "DayOfWeek >= 1 && DayOfWeek <= 5";
+var weekdayEvents = _dbContext.Events.ApplyQueryKitFilter(input).ToList();
+
+// Weekend events
+var input = "DayOfWeek ^^ [0, 6]";
+var weekendEvents = _dbContext.Events.ApplyQueryKitFilter(input).ToList();
+```
+
+## Flag Enums
+
+For flag enums (enums with `[Flags]` attribute), you'll need to work with the integer representation:
+
+```csharp
+[Flags]
+public enum Permissions
+{
+    None = 0,
+    Read = 1,
+    Write = 2,
+    Delete = 4,
+    Admin = 8
+}
+
+// Check for specific permission value
+var input = "Permissions == 3"; // Read + Write (1 + 2)
+var users = _dbContext.Users.ApplyQueryKitFilter(input).ToList();
+
+// Multiple permission levels
+var input = "Permissions ^^ [1, 3, 7]"; // Various permission combinations
+var users = _dbContext.Users.ApplyQueryKitFilter(input).ToList();
+```
+
+<Note>
+For complex flag enum operations (like checking if a specific flag is set), consider using derived properties or custom operations in your QueryKit configuration.
+</Note>
+
+## Best Practices
+
+### Document Your Enum Values
+
+```csharp
+// Add comments for clarity
+public enum OrderStatus
+{
+    Draft = 0,      // Initial state
+    Submitted = 1,  // Ready for processing
+    Processing = 2, // Being fulfilled
+    Shipped = 3,    // On the way
+    Delivered = 4,  // Completed successfully
+    Cancelled = 5   // Cancelled by user or system
+}
+```
+
+### Use Meaningful Integer Values
+
+```csharp
+// ✅ Good - logical ordering
+public enum Priority
+{
+    Low = 1,
+    Medium = 2,
+    High = 3,
+    Critical = 4
+}
+
+// ❌ Avoid - arbitrary values
+public enum Priority
+{
+    Low = 5,
+    Medium = 1,
+    High = 9,
+    Critical = 2
+}
+```
+
+### Create Helper Methods for Common Queries
+
+```csharp
+public static class OrderFilters
+{
+    public static string GetActiveOrdersFilter() 
+        => "Status > 0 && Status < 5";
+    
+    public static string GetPendingOrdersFilter() 
+        => "Status ^^ [1, 2]";
+    
+    public static string GetCompletedOrdersFilter() 
+        => "Status == 4";
+}
+
+// Usage
+var activeOrders = _dbContext.Orders
+    .ApplyQueryKitFilter(OrderFilters.GetActiveOrdersFilter())
+    .ToList();
+```
+
+## Important Considerations
+
+### Always Use Integer Values
+
+```csharp
+// ✅ Correct - use integer value
+var input = "Status == 1";
+
+// ❌ Incorrect - don't use enum name
+// var input = "Status == Active"; // This won't work
+```
+
+### Null Handling
+
+For nullable enums, check for null explicitly:
+
+```csharp
+public class Person
+{
+    public BirthMonthEnum? BirthMonth { get; set; }
+}
+
+// Check for null
+var input = "BirthMonth == null";
+var peopleWithoutBirthMonth = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Filter out nulls
+var input = "BirthMonth != null && BirthMonth == 1";
+var januaryBirthdays = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Database Storage
+
+Enum values are stored as integers in the database, so filtering is efficient:
+
+```csharp
+// This QueryKit filter:
+var input = "Status == 1";
+
+// Translates to SQL:
+// WHERE Status = 1
+```
+
+<Warning>
+Always use the integer value of the enum, not the enum name. QueryKit filters work with the numeric representation of enums.
+</Warning>
+
+## Working with Configuration
+
+You can create more user-friendly filters using derived properties:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Create boolean properties for specific enum values
+    config.DerivedProperty<Person>(p => p.Status == StatusEnum.Active)
+        .HasQueryName("isActive");
+    
+    config.DerivedProperty<Person>(p => p.BirthMonth == BirthMonthEnum.January)
+        .HasQueryName("isBornInJanuary");
+});
+
+// Now you can use more readable filters
+var input = "isActive == true && isBornInJanuary == true";
+var people = _dbContext.People.ApplyQueryKitFilter(input, config).ToList();
+```
+
+This approach makes filters more readable while still leveraging the efficient integer-based enum filtering under the hood.

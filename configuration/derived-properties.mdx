@@ -1,0 +1,160 @@
+---
+title: Derived Properties
+description: Create custom computed properties for filtering in QueryKit
+---
+
+Derived properties allow you to expose custom computed properties for filtering that don't exist directly on your entity. These are expressions that combine or transform existing properties into queryable fields.
+
+## Basic Usage
+
+Derived properties are defined using the `DerivedProperty<TModel>()` method in your configuration:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+        .HasQueryName("fullname");
+});
+
+var input = """fullname @=* "John Doe""";
+var filterExpression = FilterParser.ParseFilter<Person>(input, config);
+```
+
+## String Concatenation
+
+Combine multiple string properties into a single queryable field:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+        .HasQueryName("fullname");
+});
+
+var input = """(fullname @=* "John Doe") && age >= 18""";
+var filterExpression = FilterParser.ParseFilter<Person>(input, config);
+```
+
+This allows you to search across multiple fields as if they were a single property.
+
+## Boolean Logic
+
+Create derived boolean properties that encapsulate complex business logic:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.Age >= 18 && p.FirstName == "John")
+        .HasQueryName("adult_johns");
+});
+
+var input = """adult_johns == true""";
+var filterExpression = FilterParser.ParseFilter<Person>(input, config);
+```
+
+## Numeric Calculations
+
+Define computed numeric properties:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Product>(p => p.Price * (1 - p.DiscountPercentage))
+        .HasQueryName("discounted_price");
+        
+    config.DerivedProperty<Order>(o => o.Subtotal + o.Tax + o.ShippingCost)
+        .HasQueryName("total");
+});
+
+var input = """discounted_price < 100""";
+```
+
+## Date Calculations
+
+Create derived properties for date-based logic:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Event>(e => e.EndDate > DateTime.UtcNow)
+        .HasQueryName("is_active");
+        
+    config.DerivedProperty<User>(u => (DateTime.UtcNow - u.CreatedDate).TotalDays)
+        .HasQueryName("account_age_days");
+});
+
+var input = """is_active == true && account_age_days > 30""";
+```
+
+## Requirements and Limitations
+
+### LINQ Compatibility
+
+Derived property expressions must be translatable to LINQ. When using QueryKit with Entity Framework or other LINQ providers, ensure your expressions can be converted to SQL:
+
+```csharp
+// ✅ This works - LINQ can translate string concatenation
+config.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+    .HasQueryName("fullname");
+
+// ✅ This works - Simple numeric operations
+config.DerivedProperty<Product>(p => p.Price * 1.1m)
+    .HasQueryName("price_with_markup");
+
+// ❌ This may not work - Complex C# methods might not translate to SQL
+config.DerivedProperty<User>(u => u.Email.Split('@')[0])
+    .HasQueryName("username");
+```
+
+### Expression Simplicity
+
+Keep derived property expressions relatively simple. For complex business logic that requires:
+- Navigation to related entities
+- Access to collections
+- Complex aggregations
+
+Consider using [Custom Operations](/configuration/custom-operations) instead.
+
+## Use Cases
+
+### Full-Text Search Across Fields
+
+```csharp
+config.DerivedProperty<Customer>(c => 
+    c.FirstName + " " + c.LastName + " " + c.Email + " " + c.Phone)
+    .HasQueryName("searchable");
+
+var input = """searchable @=* "john""";
+```
+
+### Business Rules
+
+```csharp
+config.DerivedProperty<Employee>(e => 
+    e.YearsOfService >= 5 && e.PerformanceRating >= 4)
+    .HasQueryName("eligible_for_bonus");
+
+var input = """eligible_for_bonus == true""";
+```
+
+### Computed Status Fields
+
+```csharp
+config.DerivedProperty<Order>(o => 
+    o.IsPaid && o.IsShipped && !o.IsReturned)
+    .HasQueryName("is_completed");
+
+var input = """is_completed == true""";
+```
+
+## Comparison with Custom Operations
+
+| Feature | Derived Properties | Custom Operations |
+|---------|-------------------|-------------------|
+| **Complexity** | Simple expressions | Complex business logic |
+| **Related Data** | Current entity only | Can access related entities |
+| **Collections** | Not supported | Supported (e.g., `.Sum()`, `.Any()`) |
+| **Operator Access** | No | Yes |
+| **Best For** | Property combinations | Business logic encapsulation |
+
+For more advanced scenarios, see [Custom Operations](/configuration/custom-operations).

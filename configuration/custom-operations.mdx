@@ -1,0 +1,247 @@
+---
+title: Custom Operations
+description: Define complex business logic operations for advanced filtering scenarios
+---
+
+Custom operations allow you to encapsulate sophisticated filtering logic that goes beyond simple property comparisons. They enable complex business rules, access to related data, aggregations, and domain-specific filtering that can't be expressed as simple derived properties.
+
+## Basic Usage
+
+Custom operations are defined using the `CustomOperation<TModel>()` method, which takes a lambda expression with three parameters: the entity (`x`), the comparison operator (`op`), and the value to compare (`value`):
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.CustomOperation<Book>((x, op, value) => 
+        x.Orders.Where(y => y.OrderDate > DateTime.UtcNow.AddDays(-10))
+               .Sum(o => o.Quantity) > (int)value)
+        .HasQueryName("SoldUnitsMoreThan10Days");
+});
+
+var input = """SoldUnitsMoreThan10Days > 100""";
+var filterExpression = FilterParser.ParseFilter<Book>(input, config);
+```
+
+## Related Data Access
+
+Custom operations can navigate to related entities and collections, making them powerful for complex queries:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Check if a book has sold more than X units in the last 10 days
+    config.CustomOperation<Book>((x, op, value) => 
+        x.Orders.Where(y => y.OrderDate > DateTime.UtcNow.AddDays(-10))
+               .Sum(o => o.Quantity) > (int)value)
+        .HasQueryName("SoldUnitsMoreThan10Days");
+});
+
+var input = """SoldUnitsMoreThan10Days > 100""";
+```
+
+This example:
+1. Navigates to the `Orders` collection
+2. Filters orders from the last 10 days
+3. Sums the quantities
+4. Compares against the provided value
+
+## Boolean Parameters
+
+Custom operations work seamlessly with boolean values for binary logic:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Custom operation for VIP customer detection
+    config.CustomOperation<Customer>((x, op, value) => 
+        (bool)value ? 
+            (x.TotalPurchases > 10000 && x.AccountAge > 365 && x.FirstName.Contains("VIP")) :
+            !(x.TotalPurchases > 10000 && x.AccountAge > 365 && x.FirstName.Contains("VIP")))
+        .HasQueryName("isVipCustomer");
+});
+
+var input = """isVipCustomer == true""";
+```
+
+## Date Parameters
+
+Handle date-based operations with automatic type conversion:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Custom operation with date parameter handling
+    config.CustomOperation<Order>((x, op, value) => 
+        x.OrderDate > (DateTime)value)
+        .HasQueryName("isAfterDate");
+});
+
+var input = """isAfterDate == "2023-06-15T00:00:00Z" """;
+```
+
+## Type Conversion
+
+Custom operations automatically handle conversion of string values to appropriate types:
+
+### Boolean Parameters
+```csharp
+var input = """isEligible == true""";
+// Converts "true" to bool
+```
+
+### Numeric Parameters
+```csharp
+var input = """totalScore > 85.5""";
+// Converts "85.5" to decimal/double
+
+var input = """itemCount >= 10""";
+// Converts "10" to int
+```
+
+### Date Parameters
+```csharp
+var input = """lastLoginAfter == "2023-12-01T00:00:00Z" """;
+// Converts to DateTime
+```
+
+### String Parameters
+```csharp
+var input = """categoryMatches == "electronics" """;
+// Keeps as string (with quotes)
+```
+
+## Common Use Cases
+
+### Performance Metrics
+
+Calculate efficiency ratios, averages, or complex aggregations:
+
+```csharp
+config.CustomOperation<Employee>((x, op, value) => 
+    x.TasksCompleted.Count(t => t.CompletedOnTime) / (double)x.TasksCompleted.Count > (double)value)
+    .HasQueryName("onTimeCompletionRate");
+
+var input = """onTimeCompletionRate > 0.95""";
+```
+
+### Business Intelligence
+
+Revenue calculations, customer scoring, inventory analysis:
+
+```csharp
+config.CustomOperation<Product>((x, op, value) => 
+    x.Sales.Where(s => s.Date >= DateTime.UtcNow.AddMonths(-1))
+           .Sum(s => s.Quantity * s.Price) > (decimal)value)
+    .HasQueryName("monthlyRevenue");
+
+var input = """monthlyRevenue > 50000""";
+```
+
+### Time-Based Logic
+
+Recent activity checks, age calculations, expiration rules:
+
+```csharp
+config.CustomOperation<Subscription>((x, op, value) => 
+    (DateTime.UtcNow - x.LastActivityDate).TotalDays < (int)value)
+    .HasQueryName("activeWithinDays");
+
+var input = """activeWithinDays == 30""";
+```
+
+### Customer Segmentation
+
+VIP status, loyalty tiers, purchase behavior patterns:
+
+```csharp
+config.CustomOperation<Customer>((x, op, value) => 
+    x.Orders.Count >= 10 && 
+    x.Orders.Sum(o => o.Total) > 5000 &&
+    x.Orders.Any(o => o.Date >= DateTime.UtcNow.AddMonths(-3)))
+    .HasQueryName("isLoyalCustomer");
+
+var input = """isLoyalCustomer == true""";
+```
+
+### Quality Control
+
+Average ratings, compliance checks, threshold validations:
+
+```csharp
+config.CustomOperation<Restaurant>((x, op, value) => 
+    x.Reviews.Any() && x.Reviews.Average(r => r.Rating) > (double)value)
+    .HasQueryName("averageRatingAbove");
+
+var input = """averageRatingAbove > 4.5""";
+```
+
+## Features
+
+### Business Logic Encapsulation
+
+Complex domain logic can be centralized and reused across your application:
+
+```csharp
+config.CustomOperation<Loan>((x, op, value) => 
+    (x.CreditScore >= 700 && x.DebtToIncomeRatio < 0.43 && x.EmploymentYears >= 2))
+    .HasQueryName("meetsLendingCriteria");
+```
+
+### Operator Access
+
+The operation receives the comparison operator being used, allowing for flexible comparisons:
+
+```csharp
+config.CustomOperation<Product>((x, op, value) => 
+    x.Stock.Sum(s => s.Quantity) > (int)value)
+    .HasQueryName("totalInventory");
+
+// Can use different operators
+var input1 = """totalInventory > 100""";
+var input2 = """totalInventory >= 50""";
+var input3 = """totalInventory == 0""";
+```
+
+### Entity Framework Compatible
+
+Generated expressions translate to efficient SQL queries when using Entity Framework:
+
+```csharp
+config.CustomOperation<Book>((x, op, value) => 
+    x.Orders.Where(o => o.OrderDate >= DateTime.UtcNow.AddMonths(-1))
+           .Sum(o => o.Quantity) > (int)value)
+    .HasQueryName("recentSales");
+
+// Translates to efficient SQL with JOIN and aggregation
+```
+
+## Comparison with Derived Properties
+
+| Feature | Custom Operations | Derived Properties |
+|---------|------------------|--------------------|
+| **Complexity** | Complex business logic | Simple expressions |
+| **Related Data** | Can access related entities | Current entity only |
+| **Collections** | Supported (e.g., `.Sum()`, `.Any()`) | Not supported |
+| **Aggregations** | Yes | Limited |
+| **Operator Access** | Yes | No |
+| **Parameters** | Yes (with type conversion) | No |
+| **Best For** | Business logic encapsulation | Property combinations |
+
+For simpler property combinations, see [Derived Properties](/configuration/derived-properties).
+
+## Best Practices
+
+1. **Name Descriptively**: Use clear, business-oriented names for your custom operations
+2. **Keep It Queryable**: Ensure expressions can be translated by your LINQ provider (Entity Framework, etc.)
+3. **Handle Nulls**: Consider null cases in your expressions
+4. **Document Parameters**: Make parameter expectations clear (type, format, range)
+5. **Test Performance**: Verify that generated SQL queries perform well with indexes
+
+```csharp
+// Good: Clear name, handles edge cases
+config.CustomOperation<Order>((x, op, value) => 
+    x.Items != null && 
+    x.Items.Any() && 
+    x.Items.Average(i => i.Price) > (decimal)value)
+    .HasQueryName("averageItemPrice");
+```

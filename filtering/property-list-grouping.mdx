@@ -1,0 +1,200 @@
+---
+title: "Property List Grouping"
+description: "Search across multiple properties with a single comparison operation"
+---
+
+Property list grouping allows you to apply a single comparison operation across multiple properties, making it easy to search for a value in any of several fields without writing repetitive conditions.
+
+## Basic Syntax
+
+Use parentheses with comma-separated property names followed by an operator and value:
+
+```csharp
+// Search for "paul" in either FirstName OR LastName
+var input = """(FirstName, LastName) @=* "paul" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+
+// Equivalent to:
+// FirstName @=* "paul" || LastName @=* "paul"
+```
+
+## How It Works
+
+Property list grouping uses different logical operators depending on whether you're using positive or negative comparison operators:
+
+### Positive Operators (OR Logic)
+
+**Match if found in ANY field:**
+
+- `==`, `@=`, `@=*`, `_=`, `_=*`, `_-=`, `_-=*`, `^$`, `^^`
+- Match if the condition is true for **at least one** property
+
+```csharp
+// Finds records where "john" appears in FirstName OR LastName OR Email
+var input = """(FirstName, LastName, Email) @=* "john" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Negative Operators (AND Logic)
+
+**Match if NOT found in ALL fields:**
+
+- `!=`, `!@=`, `!@=*`, `!_=`, `!_=*`, `!_-=`, `!_-=*`, `!^$`, `!^^`
+- Match only if the condition is true for **every** property
+
+```csharp
+// Finds records where "test" is NOT in FirstName AND NOT in LastName
+var input = """(FirstName, LastName) !@=* "test" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+// Both fields must not contain "test"
+```
+
+<Note>
+This logical behavior ensures intuitive results. When searching for something, you want to find it in ANY field. When excluding something, you want it excluded from ALL fields.
+</Note>
+
+## Common Use Cases
+
+### Case-Insensitive Multi-Field Search
+
+```csharp
+// Search across name and email fields
+var input = """(FirstName, LastName, Email) @=* "john" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Exact Match on Multiple Properties
+
+```csharp
+// Find records where Status, Type, OR Category equals "Active"
+var input = """(Status, Type, Category) == "Active" """;
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+### Numeric Comparison Across Fields
+
+```csharp
+// Find records where Age, Rating, OR Score is greater than 25
+var input = """(Age, Rating, Score) > 25""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Negative Operators
+
+```csharp
+// Not equals - both fields must not equal "Inactive"
+var input = """(Status, Type) != "Inactive" """;
+var records = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+
+// Not contains - neither field should contain "test"
+var input = """(FirstName, LastName) !@=* "test" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Advanced Usage
+
+### Combined with Other Conditions
+
+```csharp
+// Property list grouping with additional filters
+var input = """(FirstName, LastName) @=* "smith" && Age > 25 && Status == "Active" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Multiple Property Lists
+
+```csharp
+// Search across different property groups
+var input = """(FirstName, LastName) @=* "john" && (Email, Phone) @=* "555" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Complex Logical Expressions
+
+```csharp
+// Combine property list grouping with parentheses and other operators
+var input = """((FirstName, LastName) @=* "smith" || Age == 30) && Status == "Active" """;
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+### Nested Properties
+
+```csharp
+// Search across nested object properties
+var input = """(Author.Name, Author.Email, Title) @=* "john" """;
+var books = _dbContext.Books.ApplyQueryKitFilter(input).ToList();
+```
+
+### Numeric Comparisons
+
+```csharp
+// Find records where any numeric field meets the criteria
+var input = """(Age, YearsOfExperience, Rating) >= 5""";
+var people = _dbContext.People.ApplyQueryKitFilter(input).ToList();
+```
+
+## Practical Examples
+
+### Universal Search Field
+
+```csharp
+// Implement a single search box that searches across all relevant fields
+public async Task<List<Person>> SearchPeople(string searchTerm)
+{
+    var input = $"""(FirstName, LastName, Email, Phone, Address) @=* "{searchTerm}" """;
+    return await _dbContext.People
+        .ApplyQueryKitFilter(input)
+        .ToListAsync();
+}
+```
+
+### Status Validation
+
+```csharp
+// Ensure a value doesn't appear in any status field
+var input = """(PrimaryStatus, SecondaryStatus, OverallStatus) != "Error" """;
+var healthyRecords = _dbContext.Records.ApplyQueryKitFilter(input).ToList();
+```
+
+### Multi-Language Support
+
+```csharp
+// Search across multiple language fields
+var input = """(TitleEN, TitleFR, TitleES, TitleDE) @=* "welcome" """;
+var articles = _dbContext.Articles.ApplyQueryKitFilter(input).ToList();
+```
+
+## Features and Notes
+
+- **All Operators Supported**: Works with all comparison operators from the operators table
+- **Same Property Multiple Times**: Can include the same property multiple times if needed: `(FirstName, FirstName, LastName)`
+- **Unlimited Properties**: Supports any number of properties in the list
+- **Whitespace Handling**: Handles whitespace gracefully: `( FirstName , LastName )`
+- **Type Safety**: All properties in the list should be compatible with the comparison value type
+- **Nullable Support**: Nullable properties are handled automatically
+
+<Warning>
+Ensure all properties in the list are compatible with the comparison operator and value type being used. For example, using numeric operators with string properties will result in an error.
+</Warning>
+
+## Performance Considerations
+
+Property list grouping is translated to efficient SQL OR/AND clauses:
+
+```csharp
+// This QueryKit filter:
+var input = """(FirstName, LastName, Email) @=* "john" """;
+
+// Translates to SQL similar to:
+// WHERE (LOWER(FirstName) LIKE '%john%' OR LOWER(LastName) LIKE '%john%' OR LOWER(Email) LIKE '%john%')
+```
+
+For large datasets with many properties, consider:
+
+1. **Adding indexes** on frequently searched columns
+2. **Limiting the number** of properties in the group
+3. **Using full-text search** for extensive text searching
+
+<Note>
+Property list grouping is particularly useful for implementing flexible search functionality where users don't need to specify which field they're searching in.
+</Note>

@@ -1,0 +1,198 @@
+---
+title: FilterParser
+description: Parse and generate filter expressions for IQueryable collections using string-based syntax
+---
+
+## Overview
+
+The `FilterParser` class provides functionality to parse string-based filter expressions and convert them into strongly-typed LINQ expressions. It supports complex filtering with logical operators, comparison operators, and nested property access.
+
+## Namespace
+
+```csharp
+QueryKit.FilterParser
+```
+
+## Methods
+
+### ParseFilter
+
+Generates an expression parser to filter data of the specified type.
+
+```csharp
+public static Expression<Func<T, bool>> ParseFilter<T>(
+    string input, 
+    IQueryKitConfiguration? config = null
+)
+```
+
+<ParamField path="input" type="string" required>
+  A string that defines the filter parameters. Supports logical operators (`&&`, `||`), comparison operators (e.g., `==`, `!=`, `>`, `<`, `@=`, `@=*`), and nested properties.
+  
+  **Examples:**
+  - `"Name == \"John\""`
+  - `"Age > 25 && Status == Active"`
+  - `"Email @=* \"example.com\""`
+</ParamField>
+
+<ParamField path="config" type="IQueryKitConfiguration" default="null">
+  An optional configuration object to provide custom settings for parsing, including:
+  - Logical operator aliases
+  - Comparison operator aliases
+  - Property mappings and aliases
+  - Case sensitivity settings
+  - Maximum property depth validation
+</ParamField>
+
+<ParamField path="T" type="Type Parameter">
+  The type of data to be filtered by the returned expression parser.
+</ParamField>
+
+#### Returns
+
+`Expression<Func<T, bool>>` - A lambda expression that applies the filter defined by the input parameter. This expression can be used with `IQueryable<T>` or `IEnumerable<T>` collections.
+
+#### Exceptions
+
+- `ParsingException` - Thrown when the input string cannot be parsed or contains invalid syntax
+- `UnknownFilterPropertyException` - Thrown when a referenced property does not exist on type `T`
+
+## Examples
+
+### Basic Filtering
+
+```csharp
+using QueryKit;
+
+// Simple equality filter
+var filter = FilterParser.ParseFilter<Person>("Age == 30");
+var results = people.Where(filter);
+
+// Multiple conditions with logical operators
+var complexFilter = FilterParser.ParseFilter<Person>(
+    "Age > 25 && (Status == Active || Role == Admin)"
+);
+var filteredPeople = people.Where(complexFilter);
+```
+
+### String Operations
+
+```csharp
+// Case-insensitive contains
+var emailFilter = FilterParser.ParseFilter<User>(
+    "Email @=* \"@example.com\""
+);
+
+// Starts with
+var nameFilter = FilterParser.ParseFilter<User>(
+    "FirstName ^= \"John\""
+);
+
+// Ends with
+var domainFilter = FilterParser.ParseFilter<User>(
+    "Email $= \".com\""
+);
+```
+
+### Nested Properties
+
+```csharp
+// Filter by nested property
+var addressFilter = FilterParser.ParseFilter<Person>(
+    "Address.City == \"New York\""
+);
+
+// Multiple nested properties
+var nestedFilter = FilterParser.ParseFilter<Order>(
+    "Customer.Address.ZipCode == \"12345\""
+);
+```
+
+### Using Configuration
+
+```csharp
+var config = new QueryKitConfiguration(options =>
+{
+    // Add property alias
+    options.Property(x => x.FirstName).HasQueryName("fname");
+    
+    // Configure case sensitivity
+    options.CaseInsensitiveComparison = CaseInsensitiveMode.Lower;
+});
+
+var filter = FilterParser.ParseFilter<Person>(
+    "fname == \"John\"", 
+    config
+);
+```
+
+### Collection Filters
+
+```csharp
+// Filter by collection count
+var filter = FilterParser.ParseFilter<User>(
+    "Orders ##== 5"
+);
+
+// Check if collection has any matching items
+var hasFilter = FilterParser.ParseFilter<User>(
+    "Orders ## Status == Pending"
+);
+```
+
+### Numeric and Date Comparisons
+
+```csharp
+// Numeric comparison
+var priceFilter = FilterParser.ParseFilter<Product>(
+    "Price >= 19.99 && Price <= 99.99"
+);
+
+// Date comparison
+var dateFilter = FilterParser.ParseFilter<Order>(
+    "CreatedAt > 2024-01-01T00:00:00Z"
+);
+```
+
+## Supported Operators
+
+### Comparison Operators
+
+- `==` - Equals
+- `!=` - Not equals
+- `>` - Greater than
+- `>=` - Greater than or equal
+- `<` - Less than
+- `<=` - Less than or equal
+- `@=` - Contains
+- `@=*` - Contains (case-insensitive)
+- `!@=` - Does not contain
+- `^=` - Starts with
+- `$=` - Ends with
+- `_=` - Sounds like (phonetic matching)
+
+### Collection Operators
+
+- `##` - Has (any matching items)
+- `!##` - Does not have
+- `##==` - Count equals
+- `##!=` - Count not equals
+- `##>` - Count greater than
+- `##>=` - Count greater than or equal
+- `##<` - Count less than
+- `##<=` - Count less than or equal
+
+### Logical Operators
+
+- `&&` - And
+- `||` - Or
+- `()` - Grouping
+
+## Notes
+
+- All string values must be enclosed in double quotes
+- Property names are case-insensitive by default
+- DateTime values should be in ISO 8601 format
+- GUID values are supported
+- Null values can be checked using `== null` or `!= null`
+- The parser supports arithmetic expressions in parentheses (e.g., `(Price + Tax) > 100`)

@@ -1,0 +1,35 @@
+---
+title: Using QueryKit on Enumerables
+description: Apply QueryKit filtering and sorting to in-memory IEnumerable collections
+---
+
+Since QueryKit is really just a parser for expressions, you can use it on any `IEnumerable<T>` as well, not just `IQueryable<T>` from Entity Framework.
+
+## Usage
+
+Use the `ApplyQueryKitFilter` and `ApplyQueryKitSort` methods directly on your enumerable collections:
+
+```csharp
+var recipeOne = new FakeRecipeBuilder().Build();
+var recipeTwo = new FakeRecipeBuilder().Build();
+var listOfRecipes = new List<Recipe> { recipeOne, recipeTwo };
+
+var input = $"""{nameof(Recipe.Title)} == "{recipeOne.Title}" """;
+
+var filteredRecipes = listOfRecipes.ApplyQueryKitFilter(input).ToList();
+```
+
+## Benefits
+
+- **Consistent API**: Use the same QueryKit syntax for both database queries and in-memory collections
+- **Easy Testing**: Test your filtering logic on simple in-memory lists before applying to database queries
+- **Flexible Data Sources**: Apply QueryKit to data from APIs, files, or any other enumerable source
+
+## Considerations
+
+When using QueryKit on enumerables:
+
+- Filtering happens in-memory, so all data is already loaded
+- Performance characteristics differ from database queries
+- Database-specific features like SoundEx are not available on enumerables
+- All QueryKit operators and syntax work the same way as with `IQueryable`

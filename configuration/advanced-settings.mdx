@@ -1,0 +1,291 @@
+---
+title: Advanced Settings
+description: Configure advanced QueryKit behaviors including unknown properties, property depth limits, and case sensitivity
+---
+
+QueryKit provides several advanced configuration options to control query parsing behavior, enhance security, and optimize performance.
+
+## AllowUnknownProperties
+
+By default, QueryKit throws an error when it encounters a property name that doesn't exist on your entity. Setting `AllowUnknownProperties` to `true` makes QueryKit ignore unrecognized properties instead.
+
+### Default Behavior
+
+```csharp
+var input = """Name == "John" && InvalidProperty == "value" """;
+var filterExpression = FilterParser.ParseFilter<Person>(input);
+// Throws an exception: "InvalidProperty" is not a valid property
+```
+
+### Allowing Unknown Properties
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.AllowUnknownProperties = true;
+});
+
+var input = """Name == "John" && InvalidProperty == "value" """;
+var filterExpression = FilterParser.ParseFilter<Person>(input, config);
+// Ignores InvalidProperty and filters only on Name
+```
+
+### Use Cases
+
+**Public APIs**: Allow clients to use filters that may become invalid after schema changes without breaking:
+
+```csharp
+config.AllowUnknownProperties = true;
+// API consumers can still use old property names after deprecation
+```
+
+**Graceful Degradation**: Continue processing queries even when some fields are unavailable:
+
+```csharp
+// Client sends: "name == "John" && beta_feature == true"
+// Server ignores beta_feature if it's not yet deployed
+```
+
+<Warning>
+**Security Consideration**: Enabling this setting means invalid queries won't fail fast. Only use it when you need flexible query handling and have other validation mechanisms in place.
+</Warning>
+
+## MaxPropertyDepth
+
+Limit the depth of nested property access to prevent deeply nested queries. This is crucial for security and performance when exposing QueryKit to external consumers.
+
+### Basic Configuration
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.MaxPropertyDepth = 2;
+});
+
+// These will work:
+// "Author.Name" (depth 1)
+// "Author.Address.City" (depth 2)
+
+// This will throw QueryKitPropertyDepthExceededException:
+// "Author.Address.Country.Name" (depth 3)
+```
+
+### Depth Calculation
+
+Depth is calculated by counting the number of `.` separators:
+
+- `Title` = depth 0 (root property)
+- `Author.Name` = depth 1 (one level of nesting)
+- `Author.Address.City` = depth 2 (two levels of nesting)
+- `Author.Address.Country.Name` = depth 3 (three levels of nesting)
+
+### Per-Property Overrides
+
+Override the global depth limit for specific properties:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.MaxPropertyDepth = 1; // Global limit of 1
+    
+    // Allow Author to go deeper
+    config.Property<Book>(x => x.Author)
+        .HasMaxDepth(2);
+});
+
+// "Title" works (depth 0)
+// "Author.Name" works (depth 1, within global limit)
+// "Author.Address.City" works (depth 2, uses per-property override)
+// "Publisher.Address.City" throws (depth 2, exceeds global limit of 1)
+```
+
+### Depth Limits
+
+- `MaxPropertyDepth = 0`: Only allows root-level properties
+- `MaxPropertyDepth = 1`: Allows one level of nesting (e.g., `Author.Name`)
+- `MaxPropertyDepth = 2`: Allows two levels of nesting (e.g., `Author.Address.City`)
+- `MaxPropertyDepth = null`: (default) Allows unlimited depth
+
+### Use Cases
+
+**Security**: Prevent users from crafting expensive queries with many joins:
+
+```csharp
+config.MaxPropertyDepth = 2;
+// Prevents: "A.B.C.D.E.F.G.H" which could cause many database joins
+```
+
+**Performance**: Limit query complexity for better database performance:
+
+```csharp
+config.MaxPropertyDepth = 1;
+// Ensures queries stay relatively simple
+```
+
+**API Design**: Enforce a predictable query structure:
+
+```csharp
+config.MaxPropertyDepth = 2;
+config.Property<Order>(x => x.Customer).HasMaxDepth(3);
+// Most queries limited to 2 levels, but Customer can go to 3
+```
+
+## CaseInsensitiveComparison
+
+Control which SQL case transformation is generated for case-insensitive string operators (`==*`, `@=*`, `_=*`, etc.).
+
+### Default Behavior (ToLower)
+
+By default, QueryKit uses `ToLower()` which Entity Framework translates to `LOWER()` in SQL:
+
+```csharp
+var input = """Name ==* "john" """;
+// Generates: WHERE LOWER(Name) = LOWER('john')
+```
+
+### Using ToUpper
+
+Switch to `ToUpper()` / `UPPER()` for databases with uppercase normalization:
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+});
+
+var input = """Name ==* "john" """;
+// Generates: WHERE UPPER(Name) = UPPER('john')
+```
+
+### When to Use Upper
+
+Use `CaseInsensitiveMode.Upper` when:
+
+1. **Data is stored in uppercase**: Your database normalizes text to uppercase
+2. **Uppercase indexes exist**: You have indexes on uppercase column values
+3. **SARGable queries needed**: Matching the index case improves query performance
+
+```csharp
+// Database has: CREATE INDEX idx_email ON people (UPPER(email))
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+});
+
+var input = """Email ==* "john@example.com" """;
+// Uses the UPPER index efficiently
+```
+
+### Per-Property Override
+
+Override the global setting for specific properties:
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.CaseInsensitiveComparison = CaseInsensitiveMode.Lower; // global default
+    
+    // Email column uses UPPER() for index efficiency
+    settings.Property<Person>(x => x.Email)
+        .HasCaseInsensitiveMode(CaseInsensitiveMode.Upper);
+});
+
+var input = """Name ==* "john" && Email ==* "john@example.com" """;
+// Name uses LOWER(), Email uses UPPER()
+```
+
+### Available Modes
+
+```csharp
+public enum CaseInsensitiveMode
+{
+    Lower = 0,  // Default. Generates ToLower() / LOWER()
+    Upper = 1   // Generates ToUpper() / UPPER()
+}
+```
+
+## Combining Advanced Settings
+
+All advanced settings can be used together:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Allow unknown properties for flexibility
+    config.AllowUnknownProperties = true;
+    
+    // Limit nesting for security
+    config.MaxPropertyDepth = 2;
+    
+    // Use uppercase for case-insensitive comparisons
+    config.CaseInsensitiveComparison = CaseInsensitiveMode.Upper;
+    
+    // Per-property customizations
+    config.Property<Book>(x => x.Author)
+        .HasMaxDepth(3); // Allow Author to go deeper
+        
+    config.Property<Book>(x => x.Title)
+        .HasCaseInsensitiveMode(CaseInsensitiveMode.Lower); // Use lower for Title
+});
+```
+
+## Best Practices
+
+### AllowUnknownProperties
+
+- **Default to false** for type safety and early error detection
+- **Enable for public APIs** when you need backward compatibility
+- **Document behavior** so consumers understand filtering rules
+
+### MaxPropertyDepth
+
+- **Always set for public APIs** to prevent abuse
+- **Start conservative** (depth 1-2) and increase if needed
+- **Monitor query performance** when increasing depth limits
+- **Use per-property overrides** for intentionally deep relationships
+
+### CaseInsensitiveComparison
+
+- **Match your database schema**: Use `Upper` if data is uppercase-normalized
+- **Consider indexes**: Match the case transformation of your database indexes
+- **Use per-property overrides** when different columns have different index strategies
+- **Test performance**: Verify that case-insensitive queries use indexes efficiently
+
+## Common Configurations
+
+### Public API (Security-Focused)
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.AllowUnknownProperties = true;  // Graceful degradation
+    config.MaxPropertyDepth = 2;           // Prevent abuse
+    config.CaseInsensitiveComparison = CaseInsensitiveMode.Lower;
+});
+```
+
+### Internal API (Development-Friendly)
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.AllowUnknownProperties = false; // Fail fast on errors
+    config.MaxPropertyDepth = null;        // No limit for internal use
+    config.CaseInsensitiveComparison = CaseInsensitiveMode.Lower;
+});
+```
+
+### Performance-Optimized
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.AllowUnknownProperties = false;
+    config.MaxPropertyDepth = 1;           // Minimize joins
+    config.CaseInsensitiveComparison = CaseInsensitiveMode.Upper; // Match uppercase indexes
+    
+    // Allow deeper nesting only where needed and indexed
+    config.Property<Order>(x => x.Customer)
+        .HasMaxDepth(2);
+});
+```

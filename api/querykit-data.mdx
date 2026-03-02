@@ -1,0 +1,251 @@
+---
+title: "QueryKitData"
+description: "Data transfer object for passing filter strings, sort orders, and configuration to QueryKit"
+---
+
+## Overview
+
+The `QueryKitData` class is a simple data transfer object (DTO) that encapsulates filter strings, sort orders, and configuration for QueryKit operations. It's designed to be easily bound from HTTP requests in ASP.NET Core applications.
+
+**Namespace:** `QueryKit.Configuration`
+
+## Properties
+
+<ParamField path="Filters" type="string?" default="null">
+  The filter expression string to apply to the query. Uses QueryKit's filter syntax with support for comparison operators, logical operators, and nested properties.
+  
+  Examples:
+  - `"Name == 'John' && Age > 25"`
+  - `"Status == 'Active' || Priority >= 5"`
+  - `"Address.City @@ 'New York'"`
+</ParamField>
+
+<ParamField path="SortOrder" type="string?" default="null">
+  The sort expression string to apply to the query. Supports multiple sort fields with ascending (`asc`) or descending (`desc`) order.
+  
+  Examples:
+  - `"Name asc"`
+  - `"CreatedAt desc, Name asc"`
+  - `"Priority desc, DueDate asc"`
+</ParamField>
+
+<ParamField path="Configuration" type="QueryKitConfiguration?" default="null">
+  Optional configuration to customize operator syntax, property mappings, and parsing behavior. If not provided, QueryKit uses default configuration.
+</ParamField>
+
+## Usage Examples
+
+### Basic Usage
+
+```csharp
+using QueryKit.Configuration;
+
+var data = new QueryKitData
+{
+    Filters = "Age > 18 && IsActive == true",
+    SortOrder = "LastName asc, FirstName asc"
+};
+
+var results = dbContext.Users
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+### With Custom Configuration
+
+```csharp
+var config = new QueryKitConfiguration(settings =>
+{
+    settings.EqualsOperator = "eq";
+    settings.Property<User>(u => u.FirstName).HasQueryName("name");
+});
+
+var data = new QueryKitData
+{
+    Filters = "name eq 'John'",
+    SortOrder = "name asc",
+    Configuration = config
+};
+
+var results = dbContext.Users
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+### ASP.NET Core Model Binding
+
+```csharp
+using Microsoft.AspNetCore.Mvc;
+using QueryKit.Configuration;
+
+[ApiController]
+[Route("api/[controller]")]
+public class UsersController : ControllerBase
+{
+    private readonly AppDbContext _context;
+    
+    public UsersController(AppDbContext context)
+    {
+        _context = context;
+    }
+    
+    [HttpGet]
+    public async Task<IActionResult> GetUsers([FromQuery] QueryKitData queryKit)
+    {
+        var users = await _context.Users
+            .ApplyQueryKit(queryKit)
+            .ToListAsync();
+            
+        return Ok(users);
+    }
+}
+```
+
+**Example Request:**
+```
+GET /api/users?Filters=Age > 18 && IsActive == true&SortOrder=LastName asc
+```
+
+### Complex Filtering
+
+```csharp
+var data = new QueryKitData
+{
+    Filters = "(Status == 'Active' || Status == 'Pending') && (Priority >= 3) && CreatedAt > '2024-01-01'",
+    SortOrder = "Priority desc, CreatedAt asc"
+};
+
+var results = dbContext.Tasks
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+### Nested Properties
+
+```csharp
+var data = new QueryKitData
+{
+    Filters = "Address.City == 'Seattle' && Address.State == 'WA'",
+    SortOrder = "Address.ZipCode asc"
+};
+
+var results = dbContext.Customers
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+### String Operations
+
+```csharp
+var data = new QueryKitData
+{
+    Filters = "Name @@ 'John' || Email _= 'admin@'",
+    SortOrder = "Name asc"
+};
+
+var results = dbContext.Users
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+In this example:
+- `@@` is the contains operator
+- `_=` is the starts with operator
+
+### Collection Operators
+
+```csharp
+var data = new QueryKitData
+{
+    Filters = "Status ^^ ['Active', 'Pending'] && Tags #> 0",
+    SortOrder = "CreatedAt desc"
+};
+
+var results = dbContext.Posts
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+In this example:
+- `^^` checks if Status is in the provided list
+- `#>` checks if the Tags collection count is greater than 0
+
+### Filters Only
+
+```csharp
+var data = new QueryKitData
+{
+    Filters = "IsPublished == true"
+    // SortOrder is null, no sorting applied
+};
+
+var results = dbContext.Articles
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+### Sort Only
+
+```csharp
+var data = new QueryKitData
+{
+    SortOrder = "PublishedAt desc"
+    // Filters is null, no filtering applied
+};
+
+var results = dbContext.Articles
+    .ApplyQueryKit(data)
+    .ToList();
+```
+
+## Filter Syntax Reference
+
+QueryKit supports a rich filter syntax with the following operators:
+
+### Comparison Operators
+- `==` - Equals
+- `!=` - Not equals
+- `>` - Greater than
+- `<` - Less than
+- `>=` - Greater than or equal
+- `<=` - Less than or equal
+
+### String Operators
+- `@@` - Contains
+- `!@@` - Not contains
+- `_=` - Starts with
+- `!_=` - Not starts with
+- `_-` - Ends with
+- `!_-` - Not ends with
+
+### Collection Operators
+- `^^` - In (value in collection)
+- `!^^` - Not in
+- `#==` - Collection count equals
+- `#!=` - Collection count not equals
+- `#>` - Collection count greater than
+- `#<` - Collection count less than
+- `#>=` - Collection count greater than or equal
+- `#<=` - Collection count less than or equal
+
+### Logical Operators
+- `&&` - AND
+- `||` - OR
+- `()` - Grouping for precedence
+
+### Case Insensitivity
+Append `*` to most operators for case-insensitive comparison:
+- `==*` - Case-insensitive equals
+- `@@*` - Case-insensitive contains
+
+## Sort Syntax Reference
+
+Sort expressions consist of property names followed by sort direction:
+- `PropertyName asc` - Ascending order
+- `PropertyName desc` - Descending order
+- Multiple sorts separated by commas: `Property1 asc, Property2 desc`
+
+## See Also
+
+- [QueryKitConfiguration](/api/querykit-configuration) - Configuration class for customizing QueryKit behavior
+- [QueryKitSettings](/api/querykit-settings) - Settings class for configuring QueryKit

@@ -1,0 +1,415 @@
+---
+title: Sorting
+description: Learn how to sort data using QueryKit's simple and flexible sorting syntax
+---
+
+QueryKit provides a straightforward sorting system that translates comma-delimited sort strings into LINQ `OrderBy` and `ThenBy` expressions.
+
+## Basic Usage
+
+Apply sorting to your queryable by passing a sort string to the `ApplyQueryKitSort` extension method:
+
+```csharp
+var people = _dbContext.People
+    .ApplyQueryKitSort("FirstName, Age desc")
+    .ToList();
+```
+
+### With Configuration
+
+Customize property names and control sortability:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first");
+    config.Property<Person>(x => x.LastName)
+        .PreventSort();
+});
+
+var people = _dbContext.People
+    .ApplyQueryKitSort("first, Age desc", config)
+    .ToList();
+```
+
+## Sorting Syntax
+
+### Basic Rules
+
+- Use comma-separated property names
+- Add `asc` or `desc` to specify direction (default is `asc`)
+- Prefix with `-` for descending (Sieve-style syntax)
+- Spaces after commas are optional
+
+### Valid Examples
+
+```csharp
+// Single property (ascending by default)
+var input = "Title";
+
+// Multiple properties
+var input = "Title, Age desc";
+
+// All ascending
+var input = "Title asc, Age asc";
+
+// Mix of explicit and default
+var input = "Title, Age desc, Rating";
+
+// Sieve-style syntax with minus prefix
+var input = "Title asc, -Age"; // Age descending
+var input = "Title, -Age, -Rating";
+```
+
+## Sorting Direction
+
+### Ascending (`asc`)
+
+```csharp
+// Explicit ascending
+var people = _dbContext.People
+    .ApplyQueryKitSort("FirstName asc")
+    .ToList();
+
+// Implicit ascending (default)
+var people = _dbContext.People
+    .ApplyQueryKitSort("FirstName")
+    .ToList();
+```
+
+### Descending (`desc`)
+
+```csharp
+// Explicit descending
+var people = _dbContext.People
+    .ApplyQueryKitSort("Age desc")
+    .ToList();
+
+// Sieve-style descending
+var people = _dbContext.People
+    .ApplyQueryKitSort("-Age")
+    .ToList();
+```
+
+## Multi-Level Sorting
+
+Sort by multiple properties in order of precedence:
+
+```csharp
+// Sort by LastName, then FirstName, then Age (descending)
+var people = _dbContext.People
+    .ApplyQueryKitSort("LastName, FirstName, Age desc")
+    .ToList();
+
+// Equivalent LINQ:
+var people = _dbContext.People
+    .OrderBy(x => x.LastName)
+    .ThenBy(x => x.FirstName)
+    .ThenByDescending(x => x.Age)
+    .ToList();
+```
+
+## Sorting Nested Properties
+
+Sort by properties on related entities:
+
+```csharp
+// Sort by nested property
+var books = _dbContext.Books
+    .ApplyQueryKitSort("Author.Name, Title")
+    .ToList();
+
+// Sort by deeply nested property
+var orders = _dbContext.Orders
+    .ApplyQueryKitSort("Customer.Address.City, OrderDate desc")
+    .ToList();
+```
+
+<Note>
+Nested property sorting automatically handles null values safely using conditional expressions.
+</Note>
+
+## Configuration Options
+
+### Custom Property Names
+
+Create aliases for sorting:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first");
+    config.Property<Person>(x => x.LastName)
+        .HasQueryName("last");
+    config.Property<Person>(x => x.DateOfBirth)
+        .HasQueryName("dob");
+});
+
+var people = _dbContext.People
+    .ApplyQueryKitSort("last, first, dob desc", config)
+    .ToList();
+```
+
+### Prevent Sorting
+
+Disallow sorting on specific properties:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Allow filtering but prevent sorting
+    config.Property<Person>(x => x.SensitiveData)
+        .PreventSort();
+    
+    // Can combine with other settings
+    config.Property<Person>(x => x.InternalId)
+        .HasQueryName("id")
+        .PreventSort();
+});
+
+// This will ignore the SensitiveData property
+var people = _dbContext.People
+    .ApplyQueryKitSort("FirstName, SensitiveData", config)
+    .ToList();
+// Only sorts by FirstName
+```
+
+### Derived Properties
+
+Sort by computed or derived properties:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    // Derived string concatenation
+    config.DerivedProperty<Person>(p => p.FirstName + " " + p.LastName)
+        .HasQueryName("fullname");
+    
+    // Derived calculation
+    config.DerivedProperty<Order>(o => o.Quantity * o.UnitPrice)
+        .HasQueryName("totalPrice");
+});
+
+var people = _dbContext.People
+    .ApplyQueryKitSort("fullname")
+    .ToList();
+
+var orders = _dbContext.Orders
+    .ApplyQueryKitSort("totalPrice desc")
+    .ToList();
+```
+
+### Max Property Depth
+
+Limit nested property access:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.MaxPropertyDepth = 2;
+});
+
+// ✅ Works: "Author.Name" (depth 1)
+// ✅ Works: "Author.Address.City" (depth 2)
+// ❌ Throws: "Author.Address.Country.Name" (depth 3)
+```
+
+## Combining Filtering and Sorting
+
+Use both operations together:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName)
+        .HasQueryName("first");
+    config.Property<Person>(x => x.Age)
+        .HasQueryName("age");
+});
+
+var people = _dbContext.People
+    .ApplyQueryKitFilter("""first == "Jane" && age > 10""", config)
+    .ApplyQueryKitSort("first, age desc", config)
+    .ToList();
+```
+
+### Using ApplyQueryKit
+
+Apply filtering and sorting in one call:
+
+```csharp
+var config = new QueryKitConfiguration(config =>
+{
+    config.Property<Person>(x => x.FirstName).HasQueryName("first");
+});
+
+var people = _dbContext.People
+    .ApplyQueryKit(new QueryKitData() 
+    {
+        Filters = """first == "Jane" && Age > 10""",
+        SortOrder = "first, Age desc",
+        Configuration = config
+    })
+    .ToList();
+```
+
+## Null Handling
+
+QueryKit automatically handles null values in nested properties:
+
+```csharp
+// Safely sorts even if Author is null
+var books = _dbContext.Books
+    .ApplyQueryKitSort("Author.Name")
+    .ToList();
+
+// Generated expression handles nulls:
+// x => x.Author == null ? null : x.Author.Name
+```
+
+<Note>
+Null values are typically sorted first for ascending sorts and last for descending sorts, following SQL standard behavior.
+</Note>
+
+## Working with Enumerables
+
+Sorting also works with in-memory collections:
+
+```csharp
+var people = new List<Person>
+{
+    new Person { FirstName = "Jane", Age = 30 },
+    new Person { FirstName = "John", Age = 25 },
+    new Person { FirstName = "Alice", Age = 35 }
+};
+
+var sorted = people
+    .ApplyQueryKitSort("FirstName")
+    .ToList();
+```
+
+## Error Handling
+
+Handle sorting errors gracefully:
+
+```csharp
+try
+{
+    var results = _dbContext.People
+        .ApplyQueryKitSort(sortInput, config)
+        .ToList();
+}
+catch (SortParsingException ex)
+{
+    // Property or operation not recognized
+    return BadRequest($"Invalid sort: {ex.Message}");
+}
+catch (QueryKitPropertyDepthExceededException ex)
+{
+    // Property path too deep
+    return BadRequest($"Property path too deep: {ex.Message}");
+}
+catch (QueryKitException ex)
+{
+    // Base exception - catches all QueryKit errors
+    return BadRequest(ex.Message);
+}
+```
+
+## API Integration Example
+
+Typical usage in a Web API controller:
+
+```csharp
+[HttpGet]
+public async Task<IActionResult> GetPeople(
+    [FromQuery] string? filter,
+    [FromQuery] string? sort)
+{
+    var config = new QueryKitConfiguration(config =>
+    {
+        config.Property<Person>(x => x.FirstName).HasQueryName("firstName");
+        config.Property<Person>(x => x.LastName).HasQueryName("lastName");
+        config.Property<Person>(x => x.DateOfBirth).HasQueryName("dob");
+        config.MaxPropertyDepth = 2;
+    });
+
+    try
+    {
+        var query = _dbContext.People.AsQueryable();
+
+        if (!string.IsNullOrEmpty(filter))
+            query = query.ApplyQueryKitFilter(filter, config);
+
+        if (!string.IsNullOrEmpty(sort))
+            query = query.ApplyQueryKitSort(sort, config);
+
+        var results = await query.ToListAsync();
+        return Ok(results);
+    }
+    catch (QueryKitException ex)
+    {
+        return BadRequest(new { error = ex.Message });
+    }
+}
+
+// Example requests:
+// GET /people?filter=firstName == "Jane"&sort=lastName, dob desc
+// GET /people?sort=firstName, -age
+```
+
+## Performance Considerations
+
+<Note>
+QueryKit generates efficient LINQ expressions that translate directly to SQL when used with Entity Framework Core. No in-memory operations are performed.
+</Note>
+
+### Best Practices
+
+1. **Index Sorted Columns**: Ensure database indexes exist on frequently sorted properties
+2. **Limit Property Depth**: Use `MaxPropertyDepth` to prevent expensive nested queries
+3. **Validate Input**: Always wrap QueryKit calls in try-catch for user-provided input
+4. **Use Pagination**: Combine sorting with pagination for large result sets
+
+```csharp
+var results = await _dbContext.People
+    .ApplyQueryKitFilter(filter, config)
+    .ApplyQueryKitSort(sort, config)
+    .Skip((page - 1) * pageSize)
+    .Take(pageSize)
+    .ToListAsync();
+```
+
+## Common Patterns
+
+### Default Sorting
+
+Provide default sorting when none is specified:
+
+```csharp
+var sortInput = string.IsNullOrEmpty(sort) ? "CreatedDate desc" : sort;
+
+var results = _dbContext.Items
+    .ApplyQueryKitSort(sortInput, config)
+    .ToList();
+```
+
+### Case-Insensitive Sorting
+
+Sort strings case-insensitively:
+
+```csharp
+// Database handles case sensitivity based on collation
+var results = _dbContext.People
+    .ApplyQueryKitSort("FirstName, LastName")
+    .ToList();
+
+// For in-memory collections, use a derived property
+var config = new QueryKitConfiguration(config =>
+{
+    config.DerivedProperty<Person>(p => p.FirstName.ToLower())
+        .HasQueryName("firstName");
+});
+```
