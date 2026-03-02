@@ -1,0 +1,144 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "QueryKit",
+  "projectDescription": "A .NET library that provides fluent and intuitive syntax for filtering and sorting data with string-based queries.",
+  "theme": "mint",
+  "primaryColor": "#6366f1",
+  "lightColor": "#818cf8",
+  "darkColor": "#4f46e5",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "core-concepts/filtering",
+              "core-concepts/sorting",
+              "core-concepts/configuration"
+            ]
+          },
+          {
+            "group": "Filtering",
+            "pages": [
+              "filtering/operators",
+              "filtering/logical-operators",
+              "filtering/property-list-grouping",
+              "filtering/property-to-property",
+              "filtering/arithmetic-expressions",
+              "filtering/collections",
+              "filtering/enums",
+              "filtering/nested-objects",
+              "filtering/projections"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "configuration/property-settings",
+              "configuration/derived-properties",
+              "configuration/custom-operations",
+              "configuration/custom-operators",
+              "configuration/advanced-settings"
+            ]
+          },
+          {
+            "group": "Advanced Topics",
+            "pages": [
+              "advanced/soundex",
+              "advanced/has-conversion",
+              "advanced/enumerables",
+              "advanced/error-handling"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-filtering",
+              "examples/complex-queries",
+              "examples/ef-core-integration",
+              "examples/custom-configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Extension Methods",
+            "pages": [
+              "api/apply-querykit",
+              "api/apply-querykit-filter",
+              "api/apply-querykit-sort"
+            ]
+          },
+          {
+            "group": "Configuration",
+            "pages": [
+              "api/querykit-configuration",
+              "api/querykit-settings",
+              "api/querykit-data"
+            ]
+          },
+          {
+            "group": "Parsers",
+            "pages": [
+              "api/filter-parser",
+              "api/sort-parser"
+            ]
+          },
+          {
+            "group": "Exceptions",
+            "pages": [
+              "api/exceptions"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "String-based filtering with comprehensive comparison operators",
+    "Flexible sorting with ascending and descending order",
+    "Property aliasing and custom query names",
+    "Derived properties and custom operations",
+    "Support for nested objects and collections",
+    "Arithmetic expressions in filter queries",
+    "Property-to-property comparisons",
+    "Collection filtering with Any/All semantics",
+    "Case-insensitive comparison operators",
+    "Entity Framework Core integration",
+    "Works with IQueryable and IEnumerable",
+    "Custom operator configuration"
+  ],
+  "publicApiSurface": [
+    "ApplyQueryKit<TEntity>(QueryKitData)",
+    "ApplyQueryKitFilter<TEntity>(string, QueryKitConfiguration?)",
+    "ApplyQueryKitSort<T>(string, QueryKitConfiguration?)",
+    "FilterParser.ParseFilter<TEntity>(string, QueryKitConfiguration?)",
+    "SortParser.ParseSort<T>(string, QueryKitConfiguration?)",
+    "QueryKitConfiguration",
+    "QueryKitSettings",
+    "QueryKitData",
+    "QueryKitPropertyMappings",
+    "Property<T>(Expression<Func<T, object>>)",
+    "DerivedProperty<T>(Expression<Func<T, object>>)",
+    "CustomOperation<T>(Expression<Func<T, ComparisonOperator, object, bool>>)",
+    "HasQueryName(string)",
+    "PreventFilter()",
+    "PreventSort()",
+    "HasConversion<TTarget>()",
+    "HasMaxDepth(int)",
+    "HasCaseInsensitiveMode(CaseInsensitiveMode)"
+  ]
+}
